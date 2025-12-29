@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusShield - Settings</title>
+  <link rel="stylesheet" href="css/options.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>⚙️ FocusShield Settings</h1>
+      <button id="backToPopup" class="btn btn-link">← Back</button>
+    </header>
+
+    <div class="section">
+      <h2>Blocklist Management</h2>
+      <p class="description">Add domains to blocklist. These sites will trigger notifications during Focus Mode.</p>
+      
+      <div class="preset-section">
+        <h3>Preset Distracting Sites</h3>
+        <div id="presetList" class="blocklist-items"></div>
+      </div>
+
+      <div class="custom-section">
+        <h3>Custom Domains</h3>
+        <div class="add-domain">
+          <input type="text" id="newDomainInput" placeholder="e.g., reddit.com" />
+          <button id="addDomainBtn" class="btn btn-primary">Add Domain</button>
+        </div>
+        <div id="customList" class="blocklist-items"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Notifications</h2>
+      <label class="checkbox-label">
+        <input type="checkbox" id="enableNotifications" checked>
+        <span>Enable focus nudges and session notifications</span>
+      </label>
+    </div>
+
+    <div class="section">
+      <button id="resetDataBtn" class="btn btn-danger">Reset All Data</button>
+      <p class="warning">This will delete all your statistics, sessions, and achievements. This action cannot be undone.</p>
+    </div>
+  </div>
+  <script src="db.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>
+

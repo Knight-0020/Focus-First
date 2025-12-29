@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusShield</title>
+  <link rel="stylesheet" href="css/popup.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎯 FocusShield</h1>
+    </header>
+    
+    <div id="focusModeStatus" class="status-section">
+      <div id="statusDisplay" class="status-display">
+        <span id="statusText">Focus Mode: Off</span>
+      </div>
+      <div id="timerDisplay" class="timer-display hidden">
+        <span id="timeRemaining">00:00</span>
+      </div>
+    </div>
+
+    <div id="sessionControls" class="controls-section">
+      <div class="duration-selector">
+        <label for="durationSelect">Session Duration:</label>
+        <select id="durationSelect">
+          <option value="25">25 minutes</option>
+          <option value="40">40 minutes</option>
+          <option value="50">50 minutes</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+      
+      <div id="customDurationInput" class="custom-duration hidden">
+        <label for="customMinutes">Custom (minutes):</label>
+        <input type="number" id="customMinutes" min="1" max="120" value="30">
+      </div>
+
+      <button id="startFocusBtn" class="btn btn-primary">Start Focus Mode</button>
+      <button id="stopFocusBtn" class="btn btn-secondary hidden">Stop Focus Mode</button>
+    </div>
+
+    <div class="links-section">
+      <button id="openDashboard" class="btn btn-link">📊 View Dashboard</button>
+      <button id="openOptions" class="btn btn-link">⚙️ Settings</button>
+    </div>
+  </div>
+  <script src="db.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
+
