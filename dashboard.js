@@ -1,26 +1,168 @@
 // FocusShield Dashboard Script
-// Displays statistics, achievements, and charts
+// Enhanced with dark mode, expandable sections, and download functionality
 
 let focusTimeChart = null;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
+  await loadTheme();
   setupEventListeners();
   await loadDashboardData();
 });
 
+// Load theme preference
+async function loadTheme() {
+  try {
+    const settings = await getSettings();
+    const isDark = settings.darkMode || false;
+    document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    updateThemeIcon(isDark);
+    updateChartTheme(isDark);
+  } catch (error) {
+    console.error('Error loading theme:', error);
+  }
+}
+
+// Update theme icon
+function updateThemeIcon(isDark) {
+  const themeIcon = document.querySelector('.theme-icon');
+  if (themeIcon) {
+    themeIcon.textContent = isDark ? '☀️' : '🌙';
+  }
+}
+
+// Toggle theme
+async function toggleTheme() {
+  const currentTheme = document.body.getAttribute('data-theme');
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.body.setAttribute('data-theme', newTheme);
+  updateThemeIcon(newTheme === 'dark');
+  updateChartTheme(newTheme === 'dark');
+  
+  // Save preference
+  try {
+    const settings = await getSettings();
+    settings.darkMode = newTheme === 'dark';
+    await saveSettings(settings);
+  } catch (error) {
+    console.error('Error saving theme:', error);
+  }
+}
+
+// Update chart theme
+function updateChartTheme(isDark) {
+  if (focusTimeChart) {
+    const textColor = isDark ? '#eaeaea' : '#333';
+    const gridColor = isDark ? '#3a3a5c' : '#e0e0e0';
+    
+    focusTimeChart.options.scales.x.ticks.color = textColor;
+    focusTimeChart.options.scales.y.ticks.color = textColor;
+    focusTimeChart.options.scales.x.grid.color = gridColor;
+    focusTimeChart.options.scales.y.grid.color = gridColor;
+    focusTimeChart.update();
+  }
+}
+
 // Setup event listeners
 function setupEventListeners() {
   const refreshBtn = document.getElementById('refreshBtn');
-  const backToPopup = document.getElementById('backToPopup');
+  const themeToggle = document.getElementById('themeToggle');
+  const downloadBtn = document.getElementById('downloadBtn');
 
   refreshBtn.addEventListener('click', async () => {
+    refreshBtn.disabled = true;
+    refreshBtn.querySelector('.btn-icon').textContent = '⏳';
     await loadDashboardData();
+    refreshBtn.disabled = false;
+    refreshBtn.querySelector('.btn-icon').textContent = '🔄';
   });
 
-  backToPopup.addEventListener('click', () => {
-    window.close();
+  themeToggle.addEventListener('click', toggleTheme);
+
+  downloadBtn.addEventListener('click', downloadDashboardAsImage);
+
+  // Expandable stat cards
+  document.querySelectorAll('.stat-card.expandable').forEach(card => {
+    const expandBtn = card.querySelector('.expand-btn');
+    expandBtn.addEventListener('click', () => {
+      const isExpanded = card.getAttribute('data-expanded') === 'true';
+      card.setAttribute('data-expanded', !isExpanded);
+      const details = card.querySelector('.stat-details');
+      const icon = expandBtn.querySelector('.expand-icon');
+      
+      if (!isExpanded) {
+        details.classList.remove('hidden');
+        icon.textContent = '▲';
+        expandBtn.classList.add('active');
+      } else {
+        details.classList.add('hidden');
+        icon.textContent = '▼';
+        expandBtn.classList.remove('active');
+      }
+    });
   });
+
+  // Expandable sections
+  document.querySelectorAll('.expandable-section').forEach(section => {
+    const expandBtn = section.querySelector('.expand-btn');
+    expandBtn.addEventListener('click', () => {
+      const isExpanded = section.getAttribute('data-expanded') === 'true';
+      section.setAttribute('data-expanded', !isExpanded);
+      const content = section.querySelector('.section-content');
+      const icon = expandBtn.querySelector('.expand-icon');
+      
+      if (!isExpanded) {
+        content.style.display = 'block';
+        icon.textContent = '▲';
+        expandBtn.classList.add('active');
+      } else {
+        content.style.display = 'none';
+        icon.textContent = '▼';
+        expandBtn.classList.remove('active');
+      }
+    });
+  });
+}
+
+// Download dashboard as JPEG
+async function downloadDashboardAsImage() {
+  try {
+    const downloadBtn = document.getElementById('downloadBtn');
+    downloadBtn.disabled = true;
+    downloadBtn.textContent = '⏳ Exporting...';
+
+    // Wait for html2canvas to load
+    if (typeof html2canvas === 'undefined') {
+      alert('Export feature is loading. Please try again in a moment.');
+      downloadBtn.disabled = false;
+      downloadBtn.innerHTML = '<span class="btn-icon">📷</span> Export';
+      return;
+    }
+
+    const element = document.getElementById('dashboardContent');
+    const canvas = await html2canvas(element, {
+      backgroundColor: document.body.getAttribute('data-theme') === 'dark' ? '#1a1a2e' : '#f5f7fa',
+      scale: 2,
+      logging: false,
+      useCORS: true
+    });
+
+    // Convert to JPEG
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+    const link = document.createElement('a');
+    link.download = `focusshield-dashboard-${new Date().toISOString().split('T')[0]}.jpg`;
+    link.href = dataUrl;
+    link.click();
+
+    downloadBtn.disabled = false;
+    downloadBtn.innerHTML = '<span class="btn-icon">📷</span> Export';
+  } catch (error) {
+    console.error('Error downloading dashboard:', error);
+    alert('Failed to export dashboard. Please try again.');
+    const downloadBtn = document.getElementById('downloadBtn');
+    downloadBtn.disabled = false;
+    downloadBtn.innerHTML = '<span class="btn-icon">📷</span> Export';
+  }
 }
 
 // Load all dashboard data
@@ -31,14 +173,15 @@ async function loadDashboardData() {
       loadStreak(),
       loadTopSites(),
       loadAchievements(),
-      loadFocusTimeChart()
+      loadFocusTimeChart(),
+      loadProductivityInsights()
     ]);
   } catch (error) {
     console.error('Error loading dashboard data:', error);
   }
 }
 
-// Load today's statistics
+// Load today's statistics with expanded details
 async function loadTodayStats() {
   try {
     const sessions = await getTodaySessions();
@@ -48,27 +191,74 @@ async function loadTodayStats() {
     // Calculate total focus time today
     let totalMinutes = 0;
     let distractionCount = 0;
+    let longestSession = 0;
     
     sessions.forEach(session => {
       if (session.totalFocusMinutes) {
         totalMinutes += session.totalFocusMinutes;
+        longestSession = Math.max(longestSession, session.totalFocusMinutes);
       }
       distractionCount += session.distractionCount || 0;
     });
 
+    const avgSession = sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0;
+    const focusScore = sessions.length > 0 
+      ? Math.max(0, Math.min(100, Math.round(100 - (distractionCount / sessions.length) * 10)))
+      : 0;
+
     document.getElementById('todayFocusTime').textContent = `${totalMinutes} min`;
     document.getElementById('todaySessions').textContent = `${sessions.length} session${sessions.length !== 1 ? 's' : ''}`;
     document.getElementById('distractionCount').textContent = distractionCount;
+    document.getElementById('avgSessionTime').textContent = `${avgSession} min`;
+    document.getElementById('longestSession').textContent = `${longestSession} min`;
+    document.getElementById('focusScore').textContent = `${focusScore}%`;
 
     // Total sessions
     const allSessions = await getAllFocusSessions();
-    document.getElementById('totalSessions').textContent = allSessions.filter(s => s.status === 'completed').length;
+    const completedSessions = allSessions.filter(s => s.status === 'completed');
+    document.getElementById('totalSessions').textContent = completedSessions.length;
+
+    // Calculate total focus time
+    let totalFocusMinutes = 0;
+    completedSessions.forEach(s => {
+      totalFocusMinutes += s.totalFocusMinutes || 0;
+    });
+    const totalHours = Math.floor(totalFocusMinutes / 60);
+    const remainingMinutes = totalFocusMinutes % 60;
+    document.getElementById('totalFocusTime').textContent = `${totalHours}h ${remainingMinutes}m`;
+
+    // Completion rate (sessions that completed vs started)
+    const startedSessions = allSessions.length;
+    const completionRate = startedSessions > 0 
+      ? Math.round((completedSessions.length / startedSessions) * 100)
+      : 0;
+    document.getElementById('completionRate').textContent = `${completionRate}%`;
+
+    // Average distractions
+    const avgDistractions = sessions.length > 0 
+      ? (distractionCount / sessions.length).toFixed(1)
+      : 0;
+    document.getElementById('avgDistractions').textContent = avgDistractions;
+
+    // Top distraction
+    const distractionMap = {};
+    completedSessions.forEach(session => {
+      if (session.distractions) {
+        session.distractions.forEach(d => {
+          distractionMap[d.domain] = (distractionMap[d.domain] || 0) + 1;
+        });
+      }
+    });
+    const topDistraction = Object.keys(distractionMap).length > 0
+      ? Object.entries(distractionMap).sort((a, b) => b[1] - a[1])[0][0]
+      : '-';
+    document.getElementById('topDistraction').textContent = topDistraction;
   } catch (error) {
     console.error('Error loading today stats:', error);
   }
 }
 
-// Load streak information
+// Load streak information with expanded details
 async function loadStreak() {
   try {
     const sessions = await getAllFocusSessions();
@@ -76,9 +266,55 @@ async function loadStreak() {
     const streak = await calculateStreak(completedSessions);
     
     document.getElementById('streakDays').textContent = `${streak} day${streak !== 1 ? 's' : ''}`;
+
+    // Calculate best streak
+    const bestStreak = await calculateBestStreak(completedSessions);
+    document.getElementById('bestStreak').textContent = `${bestStreak} day${bestStreak !== 1 ? 's' : ''}`;
+
+    // Total focus days
+    const daysWithSessions = new Set();
+    completedSessions.forEach(session => {
+      const date = new Date(session.endTime);
+      date.setHours(0, 0, 0, 0);
+      daysWithSessions.add(date.getTime());
+    });
+    document.getElementById('totalFocusDays').textContent = daysWithSessions.size;
   } catch (error) {
     console.error('Error loading streak:', error);
   }
+}
+
+// Calculate best streak
+async function calculateBestStreak(sessions) {
+  if (sessions.length === 0) return 0;
+
+  sessions.sort((a, b) => b.endTime - a.endTime);
+
+  const daysWithSessions = new Set();
+  sessions.forEach(session => {
+    const date = new Date(session.endTime);
+    date.setHours(0, 0, 0, 0);
+    daysWithSessions.add(date.getTime());
+  });
+
+  const sortedDays = Array.from(daysWithSessions).sort((a, b) => b - a);
+  
+  let bestStreak = 0;
+  let currentStreak = 0;
+  let expectedDate = sortedDays[0];
+
+  for (const day of sortedDays) {
+    if (day === expectedDate) {
+      currentStreak++;
+      expectedDate -= 24 * 60 * 60 * 1000;
+      bestStreak = Math.max(bestStreak, currentStreak);
+    } else {
+      currentStreak = 1;
+      expectedDate = day - 24 * 60 * 60 * 1000;
+    }
+  }
+
+  return bestStreak;
 }
 
 // Calculate streak (same logic as background.js)
@@ -158,10 +394,10 @@ async function loadAchievements() {
     const achievementsList = document.getElementById('achievementsList');
     
     const achievementDefinitions = {
-      'FIRST_SESSION': { name: 'First Steps', description: 'Complete your first focus session' },
-      'THREE_SESSIONS_DAY': { name: 'Triple Focus', description: 'Complete 3 focus sessions in one day' },
-      'TWO_DAY_STREAK': { name: 'On a Roll', description: 'Maintain a 2-day focus streak' },
-      'WEEK_STREAK': { name: 'Week Warrior', description: 'Maintain a 7-day focus streak' }
+      'FIRST_SESSION': { name: 'First Steps', description: 'Complete your first focus session', icon: '🎯' },
+      'THREE_SESSIONS_DAY': { name: 'Triple Focus', description: 'Complete 3 focus sessions in one day', icon: '🔥' },
+      'TWO_DAY_STREAK': { name: 'On a Roll', description: 'Maintain a 2-day focus streak', icon: '⚡' },
+      'WEEK_STREAK': { name: 'Week Warrior', description: 'Maintain a 7-day focus streak', icon: '🏆' }
     };
 
     const unlockedAchievements = achievements.filter(a => a.unlocked);
@@ -172,11 +408,11 @@ async function loadAchievements() {
     }
 
     achievementsList.innerHTML = unlockedAchievements.map(achievement => {
-      const def = achievementDefinitions[achievement.id] || { name: achievement.id, description: '' };
+      const def = achievementDefinitions[achievement.id] || { name: achievement.id, description: '', icon: '🏆' };
       const date = new Date(achievement.unlockedAt);
       return `
         <div class="achievement-item unlocked">
-          <div class="achievement-icon">🏆</div>
+          <div class="achievement-icon">${def.icon}</div>
           <div class="achievement-info">
             <div class="achievement-name">${def.name}</div>
             <div class="achievement-description">${def.description}</div>
@@ -187,6 +423,66 @@ async function loadAchievements() {
     }).join('');
   } catch (error) {
     console.error('Error loading achievements:', error);
+  }
+}
+
+// Load productivity insights
+async function loadProductivityInsights() {
+  try {
+    const sessions = await getAllFocusSessions();
+    const completedSessions = sessions.filter(s => s.status === 'completed');
+    const insightsList = document.getElementById('insightsList');
+
+    if (completedSessions.length === 0) {
+      insightsList.innerHTML = '<p class="empty-state">Complete more sessions to unlock insights</p>';
+      return;
+    }
+
+    const insights = [];
+
+    // Best day of week
+    const dayStats = {};
+    completedSessions.forEach(session => {
+      const day = new Date(session.endTime).toLocaleDateString('en-US', { weekday: 'long' });
+      dayStats[day] = (dayStats[day] || 0) + (session.totalFocusMinutes || 0);
+    });
+    const bestDay = Object.entries(dayStats).sort((a, b) => b[1] - a[1])[0];
+    if (bestDay) {
+      insights.push({
+        icon: '📅',
+        title: 'Most Productive Day',
+        text: `${bestDay[0]} with ${bestDay[1]} minutes of focus time`
+      });
+    }
+
+    // Average session length
+    const avgLength = completedSessions.reduce((sum, s) => sum + (s.totalFocusMinutes || 0), 0) / completedSessions.length;
+    insights.push({
+      icon: '⏱️',
+      title: 'Average Session',
+      text: `${Math.round(avgLength)} minutes per session`
+    });
+
+    // Total focus time
+    const totalMinutes = completedSessions.reduce((sum, s) => sum + (s.totalFocusMinutes || 0), 0);
+    const totalHours = Math.floor(totalMinutes / 60);
+    insights.push({
+      icon: '🎯',
+      title: 'Total Focus Time',
+      text: `${totalHours} hours and ${totalMinutes % 60} minutes`
+    });
+
+    insightsList.innerHTML = insights.map(insight => `
+      <div class="insight-item">
+        <div class="insight-icon">${insight.icon}</div>
+        <div class="insight-content">
+          <div class="insight-title">${insight.title}</div>
+          <div class="insight-text">${insight.text}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch (error) {
+    console.error('Error loading insights:', error);
   }
 }
 
@@ -218,6 +514,10 @@ async function loadFocusTimeChart() {
     }
 
     const ctx = document.getElementById('focusTimeChart').getContext('2d');
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#eaeaea' : '#333';
+    const gridColor = isDark ? '#3a3a5c' : '#e0e0e0';
+    const primaryColor = isDark ? '#7c8dff' : '#667eea';
     
     if (focusTimeChart) {
       focusTimeChart.destroy();
@@ -230,16 +530,54 @@ async function loadFocusTimeChart() {
         datasets: [{
           label: 'Focus Time (minutes)',
           data: focusMinutes,
-          backgroundColor: 'rgba(54, 162, 235, 0.6)',
-          borderColor: 'rgba(54, 162, 235, 1)',
-          borderWidth: 1
+          backgroundColor: isDark ? 'rgba(124, 141, 255, 0.6)' : 'rgba(102, 126, 234, 0.6)',
+          borderColor: primaryColor,
+          borderWidth: 2,
+          borderRadius: 8
         }]
       },
       options: {
         responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: isDark ? '#16213e' : '#fff',
+            titleColor: textColor,
+            bodyColor: textColor,
+            borderColor: primaryColor,
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 8
+          }
+        },
         scales: {
+          x: {
+            ticks: {
+              color: textColor,
+              font: {
+                size: 12
+              }
+            },
+            grid: {
+              color: gridColor,
+              drawBorder: false
+            }
+          },
           y: {
-            beginAtZero: true
+            beginAtZero: true,
+            ticks: {
+              color: textColor,
+              font: {
+                size: 12
+              }
+            },
+            grid: {
+              color: gridColor,
+              drawBorder: false
+            }
           }
         }
       }
@@ -248,4 +586,3 @@ async function loadFocusTimeChart() {
     console.error('Error loading focus time chart:', error);
   }
 }
-

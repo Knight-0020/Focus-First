@@ -9,12 +9,35 @@
 <body>
   <div class="container">
     <header>
-      <h1>⚙️ FocusShield Settings</h1>
-      <button id="backToPopup" class="btn btn-link">← Back</button>
+      <div class="header-left">
+        <h1>⚙️ FocusShield Settings</h1>
+        <p class="header-subtitle">Customize your focus experience</p>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggle" class="btn btn-icon-only" title="Toggle Theme">
+          <span class="theme-icon">🌙</span>
+        </button>
+        <button id="backToPopup" class="btn btn-link">← Back</button>
+      </div>
     </header>
 
+    <!-- Appearance Section -->
     <div class="section">
-      <h2>Blocklist Management</h2>
+      <h2>🎨 Appearance</h2>
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Dark Mode</span>
+          <span class="setting-description">Use dark theme for comfortable viewing</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="darkModeToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>🚫 Blocklist Management</h2>
       <p class="description">Add domains to blocklist. These sites will trigger notifications during Focus Mode.</p>
       
       <div class="preset-section">
@@ -26,23 +49,37 @@
         <h3>Custom Domains</h3>
         <div class="add-domain">
           <input type="text" id="newDomainInput" placeholder="e.g., reddit.com" />
-          <button id="addDomainBtn" class="btn btn-primary">Add Domain</button>
+          <button id="addDomainBtn" class="btn btn-primary">
+            <span class="btn-icon">+</span> Add
+          </button>
         </div>
         <div id="customList" class="blocklist-items"></div>
       </div>
     </div>
 
     <div class="section">
-      <h2>Notifications</h2>
-      <label class="checkbox-label">
-        <input type="checkbox" id="enableNotifications" checked>
-        <span>Enable focus nudges and session notifications</span>
-      </label>
+      <h2>🔔 Notifications</h2>
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-label">Focus Nudges</span>
+          <span class="setting-description">Get reminded when visiting distracting sites</span>
+        </div>
+        <label class="toggle-switch">
+          <input type="checkbox" id="enableNotifications" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
 
-    <div class="section">
-      <button id="resetDataBtn" class="btn btn-danger">Reset All Data</button>
-      <p class="warning">This will delete all your statistics, sessions, and achievements. This action cannot be undone.</p>
+    <div class="section danger-zone">
+      <h2>⚠️ Danger Zone</h2>
+      <div class="danger-content">
+        <div class="danger-info">
+          <p class="danger-title">Reset All Data</p>
+          <p class="danger-description">This will delete all your statistics, sessions, and achievements. This action cannot be undone.</p>
+        </div>
+        <button id="resetDataBtn" class="btn btn-danger">Reset Data</button>
+      </div>
     </div>
   </div>
   <script src="db.js"></script>
