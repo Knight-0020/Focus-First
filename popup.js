@@ -229,29 +229,22 @@ async function stopFocusMode() {
 
 // Skip to next session
 async function skipSession() {
-  const breaks = getBreakDurations();
-  
-  if (pomodoroState.sessionType === 'focus') {
-    // Move to break
-    if (pomodoroState.currentSession >= pomodoroState.totalSessions) {
-      pomodoroState.sessionType = 'longBreak';
-      pomodoroState.remainingSeconds = breaks.longBreak * 60;
-    } else {
-      pomodoroState.sessionType = 'shortBreak';
-      pomodoroState.remainingSeconds = breaks.shortBreak * 60;
-    }
-  } else {
-    // Move to next focus session
-    if (pomodoroState.sessionType === 'longBreak') {
-      pomodoroState.currentSession = 1;
-    } else {
-      pomodoroState.currentSession++;
-    }
-    pomodoroState.sessionType = 'focus';
-    pomodoroState.remainingSeconds = getDurationMinutes() * 60;
+  try {
+    // Stop the active focus session so polling doesn't immediately restore it
+    await chrome.runtime.sendMessage({ action: 'stopFocusMode' });
+  } catch (error) {
+    console.error('Error skipping session:', error);
   }
-  
+
+  // Reset local state to a fresh focus session
+  pomodoroState.isRunning = false;
+  pomodoroState.isPaused = false;
+  pomodoroState.sessionType = 'focus';
+  const minutes = getDurationMinutes();
+  pomodoroState.remainingSeconds = minutes * 60;
   pomodoroState.totalSeconds = pomodoroState.remainingSeconds;
+
+  updateTimerDisplay(minutes, 0);
   updateUIState();
   updateSessionIndicators();
 }
