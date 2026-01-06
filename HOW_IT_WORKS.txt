@@ -1,0 +1,502 @@
+================================================================================
+                         FOCUS FIRST - HOW IT WORKS
+                    A Complete Guide to the Extension
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. What is Focus First?
+2. How to Install
+3. Main Features
+4. File Structure Explained
+5. How Each Component Works
+6. How to Use the Extension
+7. Technical Details
+
+================================================================================
+1. WHAT IS FOCUS FIRST?
+================================================================================
+
+Focus First is a Chrome browser extension designed to help students and 
+professionals stay focused while working. It combines:
+
+- A Pomodoro Timer (work in focused intervals with breaks)
+- Website Blocking (get notified when visiting distracting sites)
+- Time Tracking (see how much time you spend on different websites)
+- Statistics Dashboard (view your productivity over time)
+- Achievement System (earn badges for staying focused)
+
+================================================================================
+2. HOW TO INSTALL
+================================================================================
+
+Step 1: Open Chrome browser
+Step 2: Go to chrome://extensions/
+Step 3: Enable "Developer mode" (toggle in top-right corner)
+Step 4: Click "Load unpacked"
+Step 5: Select the DTL_EL folder (this project folder)
+Step 6: The extension icon will appear in your toolbar
+
+================================================================================
+3. MAIN FEATURES
+================================================================================
+
+A) POMODORO TIMER
+   - Work for 25 minutes (customizable)
+   - Take a 5-minute short break
+   - After 4 sessions, take a 15-minute long break
+   - Visual progress ring shows time remaining
+   - Sound notification when timer ends
+
+B) WEBSITE BLOCKLIST
+   - Add distracting websites (Instagram, YouTube, TikTok, etc.)
+   - When you visit a blocked site during Focus Mode, you get a notification
+   - Choose to "Stay Focused" or "Continue" (logged as distraction)
+
+C) STATISTICS DASHBOARD
+   - See total focus time (today and all-time)
+   - View your current streak (consecutive days of focusing)
+   - Bar chart showing focus time for the last 7 days
+   - Top websites by time spent
+   - Productivity insights
+
+D) ACHIEVEMENTS
+   - First Steps: Complete your first focus session
+   - Triple Focus: Complete 3 sessions in one day
+   - On a Roll: Maintain a 2-day streak
+   - Week Warrior: Maintain a 7-day streak
+
+================================================================================
+4. FILE STRUCTURE EXPLAINED
+================================================================================
+
+DTL_EL/
+│
+├── manifest.json      - Extension configuration (name, permissions, etc.)
+│
+├── popup.html         - The popup that opens when you click the extension icon
+├── popup.js           - Logic for the Pomodoro timer in the popup
+├── css/popup.css      - Styling for the popup
+│
+├── dashboard.html     - Full-page statistics dashboard
+├── dashboard.js       - Logic for loading and displaying statistics
+├── css/dashboard.css  - Styling for the dashboard
+│
+├── options.html       - Settings page
+├── options.js         - Logic for managing settings and blocklist
+├── css/options.css    - Styling for the settings page
+│
+├── background.js      - Runs in the background, tracks tabs and timers
+│
+├── db.js              - Database helper functions (IndexedDB)
+│
+├── sounds/            - Folder for ambient sound files (add your own MP3s)
+│
+└── icons/             - Extension icons (16px, 48px, 128px)
+
+================================================================================
+5. HOW EACH COMPONENT WORKS
+================================================================================
+
+A) MANIFEST.JSON
+----------------
+This is the "ID card" of the extension. It tells Chrome:
+- The extension name: "Focus First"
+- What permissions it needs (tabs, notifications, alarms, storage)
+- Which files to use for popup, options, and background script
+- What icons to display
+
+B) BACKGROUND.JS (The Brain)
+-----------------------------
+This script runs silently in the background and:
+
+1. TRACKS TAB ACTIVITY
+   - When you open a tab, it records the domain and timestamp
+   - When you close/switch tabs, it calculates time spent
+   - Saves this data to the database
+
+2. MANAGES FOCUS MODE
+   - Starts/stops the timer when you click buttons
+   - Sets an alarm for when the session should end
+   - Checks if you visit blocked websites
+   - Shows notifications for distractions
+
+3. HANDLES NOTIFICATIONS
+   - Shows "Focus Session Complete!" when timer ends
+   - Shows warnings when visiting blocked sites
+   - Records if you click "Continue" as a distraction
+
+C) POPUP.JS (The Timer Interface)
+----------------------------------
+When you click the extension icon:
+
+1. Displays the current timer state (Ready, Running, Paused)
+2. Shows a circular progress ring
+3. Handles button clicks (Start, Pause, Stop, Skip)
+4. Sends messages to background.js to control the timer
+5. Updates every second to show remaining time
+6. Shows quick stats (today's minutes, streak count)
+
+D) DB.JS (The Database)
+------------------------
+Uses IndexedDB (browser's built-in database) to store:
+
+1. DOMAIN STATS
+   - Which websites you visit
+   - Total time spent on each
+   - Number of visits
+
+2. FOCUS SESSIONS
+   - When each session started/ended
+   - Planned duration vs actual duration
+   - Number of distractions
+   - Which sites distracted you
+
+3. ACHIEVEMENTS
+   - Which achievements are unlocked
+   - When they were unlocked
+
+4. SETTINGS
+   - Dark mode preference
+   - Blocked websites list
+   - Notification preferences
+
+E) DASHBOARD.JS (Statistics)
+-----------------------------
+The dashboard page:
+
+1. Loads all data from the database
+2. Calculates statistics (totals, averages, streaks)
+3. Creates a bar chart using Chart.js library
+4. Displays achievements
+5. Shows productivity insights
+
+F) OPTIONS.JS (Settings)
+-------------------------
+The settings page lets you:
+
+1. Toggle dark mode
+2. Add/remove blocked websites
+3. Enable/disable notifications
+4. Reset all data (danger zone)
+
+================================================================================
+6. HOW TO USE THE EXTENSION
+================================================================================
+
+STARTING A FOCUS SESSION:
+1. Click the Focus First icon in your toolbar
+2. Select a duration (25, 40, or 50 minutes, or custom)
+3. Click the Play button (▶)
+4. The timer starts and websites are now monitored
+
+DURING A SESSION:
+- You'll see the countdown timer and progress ring
+- If you visit a blocked site, you'll get a notification
+- You can pause or stop the session anytime
+
+WHEN SESSION ENDS:
+- You'll get a notification saying "Focus Session Complete!"
+- Your stats are automatically saved
+- The timer resets for the next session
+
+VIEWING YOUR PROGRESS:
+1. Click the Focus First icon
+2. Click "📊 Dashboard" at the bottom
+3. See your stats, charts, and achievements
+
+CHANGING SETTINGS:
+1. Click the Focus First icon
+2. Click "⚙️ Settings" at the bottom
+3. Toggle dark mode, manage blocked sites, etc.
+
+================================================================================
+7. TECHNICAL DETAILS (IN-DEPTH)
+================================================================================
+
+-------------------------------------------------------------------------------
+PERMISSIONS EXPLAINED (What the extension can access and why)
+-------------------------------------------------------------------------------
+
+When you install the extension, Chrome asks for certain permissions. Here's 
+exactly what each one does:
+
+TABS PERMISSION:
+  What it allows: Access to browser tab information
+  Why we need it: 
+    - To know which website you're currently viewing
+    - To detect when you open, close, or switch tabs
+    - To extract the domain name (e.g., "youtube.com") from the full URL
+  How it's used:
+    - When you open youtube.com, background.js detects this
+    - It records: "User opened youtube.com at 2:30 PM"
+    - When you close the tab or navigate away, it calculates time spent
+    - During Focus Mode, it checks if the domain is in your blocklist
+
+NOTIFICATIONS PERMISSION:
+  What it allows: Show pop-up notifications on your desktop
+  Why we need it:
+    - To alert you when a focus session ends
+    - To warn you when visiting a blocked website
+    - To remind you to stay focused
+  How it's used:
+    - chrome.notifications.create() shows a notification
+    - Notifications can have buttons ("Stay Focused" / "Continue")
+    - Clicking buttons triggers different actions in background.js
+
+ALARMS PERMISSION:
+  What it allows: Schedule events to happen at specific times
+  Why we need it:
+    - To trigger the end of a focus session
+    - Alarms work even if the popup is closed
+  How it's used:
+    - When you start a 25-minute session, an alarm is set for 25 minutes later
+    - chrome.alarms.create('focusSessionEnd', { when: endTime })
+    - When the alarm fires, background.js completes the session
+
+STORAGE PERMISSION:
+  What it allows: Save small amounts of data in Chrome's storage
+  Why we need it:
+    - Quick access to temporary data
+    - Store notification-related data briefly
+  How it's used:
+    - Mainly used for linking notification IDs to domain names
+    - Most data is stored in IndexedDB instead (see below)
+
+HOST PERMISSIONS (<all_urls>):
+  What it allows: Access to all website URLs
+  Why we need it:
+    - To track time spent on ANY website, not just specific ones
+    - Without this, we couldn't monitor your browsing for the dashboard
+  Privacy note:
+    - We only extract the domain name (e.g., "reddit.com")
+    - We don't read page content or your login information
+    - All data stays on your computer
+
+-------------------------------------------------------------------------------
+DATA STORAGE (How your data is saved)
+-------------------------------------------------------------------------------
+
+The extension uses IndexedDB, which is a database built into your browser.
+Think of it like a spreadsheet that lives inside Chrome.
+
+WHY INDEXEDDB (not regular storage)?
+  - Can store large amounts of data
+  - Supports complex queries
+  - Data persists across browser restarts
+  - Faster than Chrome's storage API for our needs
+
+DATABASE NAME: "focusfirstDB"
+
+THE DATABASE HAS 4 "TABLES" (called Object Stores):
+
+1. DOMAIN STATS TABLE
+   Stores information about websites you visit.
+   
+   Example record:
+   {
+     domain: "youtube.com",
+     totalTimeMs: 3600000,        // 1 hour in milliseconds
+     visitCount: 15,              // Visited 15 times
+     firstVisited: 1704067200000, // Timestamp of first visit
+     lastVisited: 1704153600000   // Timestamp of last visit
+   }
+
+2. FOCUS SESSIONS TABLE
+   Stores each focus session you complete.
+   
+   Example record:
+   {
+     id: "1704067200000",         // Unique ID (timestamp when started)
+     startTime: 1704067200000,    // When session started
+     endTime: 1704068700000,      // When session ended
+     plannedDuration: 25,         // You wanted 25 minutes
+     totalFocusMinutes: 24,       // You actually focused for 24 minutes
+     status: "completed",         // "active", "completed", or "cancelled"
+     distractionCount: 2,         // You got distracted twice
+     distractions: [              // Details of each distraction
+       { domain: "instagram.com", timestamp: 1704067500000 },
+       { domain: "twitter.com", timestamp: 1704068000000 }
+     ]
+   }
+
+3. ACHIEVEMENTS TABLE
+   Stores which achievements you've unlocked.
+   
+   Example record:
+   {
+     id: "FIRST_SESSION",
+     unlocked: true,
+     unlockedAt: 1704067200000
+   }
+
+4. SETTINGS TABLE
+   Stores your preferences.
+   
+   Example record:
+   {
+     key: "settings",
+     value: {
+       blocklist: ["instagram.com", "youtube.com", "tiktok.com"],
+       enableNotifications: true,
+       darkMode: true
+     }
+   }
+
+WHERE IS THIS DATA STORED?
+  - In your Chrome profile folder on your computer
+  - Location: C:\Users\[YourName]\AppData\Local\Google\Chrome\User Data\Default\IndexedDB
+  - It's NOT uploaded to any server
+  - Only YOU can access it
+
+HOW TO VIEW THE DATA (for debugging):
+  1. Right-click the extension popup → "Inspect"
+  2. Go to "Application" tab
+  3. Expand "IndexedDB" in the left sidebar
+  4. Click on "focusfirstDB" to see all tables
+
+-------------------------------------------------------------------------------
+MESSAGE PASSING (How different parts communicate)
+-------------------------------------------------------------------------------
+
+The extension has 3 main parts that need to talk to each other:
+
+1. POPUP (popup.js) - The timer interface you see
+2. BACKGROUND (background.js) - Runs silently, manages timers
+3. OPTIONS (options.js) - The settings page
+
+They communicate using Chrome's messaging system, like sending letters.
+
+HOW IT WORKS:
+
+POPUP SENDS A MESSAGE TO BACKGROUND:
+```
+// In popup.js - User clicks "Start"
+chrome.runtime.sendMessage({
+  action: 'startFocusMode',
+  duration: 25
+});
+```
+
+BACKGROUND RECEIVES AND RESPONDS:
+```
+// In background.js
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'startFocusMode') {
+    // Start the timer...
+    sendResponse({ success: true, sessionId: '12345' });
+  }
+  return true; // Keep channel open for async response
+});
+```
+
+POPUP RECEIVES THE RESPONSE:
+```
+// Back in popup.js
+const response = await chrome.runtime.sendMessage({...});
+if (response.success) {
+  // Update the UI to show timer running
+}
+```
+
+COMMON MESSAGES IN THIS EXTENSION:
+
+| Message Action     | Sent From | Sent To    | Purpose                    |
+|--------------------|-----------|------------|----------------------------|
+| startFocusMode     | popup     | background | Start a new focus session  |
+| stopFocusMode      | popup     | background | End the current session    |
+| pauseFocusMode     | popup     | background | Pause the timer            |
+| resumeFocusMode    | popup     | background | Resume paused timer        |
+| getFocusStatus     | popup     | background | Get current timer state    |
+
+WHY NOT JUST USE ONE SCRIPT?
+  - The popup closes when you click away, but timers need to keep running
+  - background.js stays active even when popup is closed
+  - This separation allows the timer to work reliably
+
+-------------------------------------------------------------------------------
+DARK MODE (How theme switching works)
+-------------------------------------------------------------------------------
+
+STEP 1: HTML STRUCTURE
+  The <body> tag has a "data-theme" attribute:
+  <body data-theme="light">  or  <body data-theme="dark">
+
+STEP 2: CSS STYLING
+  CSS uses this attribute to apply different colors:
+  
+  /* Light mode colors */
+  body {
+    background: #f5f7fa;
+    color: #333333;
+  }
+  
+  /* Dark mode colors - overrides the above when data-theme="dark" */
+  [data-theme="dark"] body {
+    background: #1a1a2e;
+    color: #eaeaea;
+  }
+
+STEP 3: JAVASCRIPT TOGGLE
+  When you click the toggle:
+  
+  function toggleTheme() {
+    const currentTheme = document.body.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.body.setAttribute('data-theme', newTheme);
+    
+    // Save preference to database
+    settings.darkMode = (newTheme === 'dark');
+    saveSettings(settings);
+  }
+
+STEP 4: LOADING SAVED PREFERENCE
+  When the page loads, it reads your saved preference:
+  
+  async function loadSettings() {
+    const settings = await getSettings();
+    const isDark = settings.darkMode === true;
+    document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  }
+
+WHY THIS APPROACH?
+  - No page reload needed to switch themes
+  - CSS handles all the visual changes
+  - JavaScript just flips a single attribute
+  - Preference persists across sessions
+
+-------------------------------------------------------------------------------
+THE TIMER MECHANISM (How the countdown works)
+-------------------------------------------------------------------------------
+
+The timer uses two systems working together:
+
+1. CHROME ALARMS (for reliability)
+   - Sets an alarm for when the session should end
+   - Works even if you close the popup
+   - Example: Session starts at 2:00 PM, alarm set for 2:25 PM
+
+2. POLLING (for display updates)
+   - Every 1 second, popup.js asks background.js for the current status
+   - This updates the countdown display (24:59, 24:58, 24:57...)
+   - Uses setInterval() to check repeatedly
+
+WHY BOTH?
+  - Polling alone would stop if you close the popup
+  - Alarms alone can't update the visual countdown
+  - Together, they ensure the timer always completes AND looks smooth
+
+TIMER STATES:
+  - isRunning: true/false - Is the timer actively counting down?
+  - isPaused: true/false - Is the timer paused?
+  - sessionType: 'focus', 'shortBreak', or 'longBreak'
+  - remainingSeconds: How many seconds left
+  - totalSeconds: Original duration (for progress calculation)
+
+================================================================================
+                              END OF GUIDE
+================================================================================
+
+For more help or to report issues, check the README.md file or visit:
+https://github.com/Knight-0020/Focus-First
+

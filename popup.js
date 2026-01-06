@@ -599,6 +599,8 @@ function startStopwatch(resume = false) {
 }
 
 let whiteNoiseAudio = null;
+let whiteNoiseVolume = 1.0; // Maximum volume 100%
+
 function handleWhiteNoise(value) {
   if (whiteNoiseAudio) {
     whiteNoiseAudio.pause();
@@ -608,10 +610,18 @@ function handleWhiteNoise(value) {
   const src = `sounds/${value}.mp3`;
   whiteNoiseAudio = new Audio(src);
   whiteNoiseAudio.loop = true;
-  whiteNoiseAudio.volume = 0.35;
+  whiteNoiseAudio.volume = whiteNoiseVolume;
   whiteNoiseAudio.play().catch(() => {
     alert('Add your white noise file to /sounds and reload the extension.');
   });
+}
+
+// Set white noise volume (0.0 to 1.0)
+function setWhiteNoiseVolume(volume) {
+  whiteNoiseVolume = volume;
+  if (whiteNoiseAudio) {
+    whiteNoiseAudio.volume = volume;
+  }
 }
 
 // Cleanup on popup close
