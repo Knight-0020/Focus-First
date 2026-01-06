@@ -1,4 +1,4 @@
-/* FocusShield Dashboard Styles - Enhanced with Dark Mode */
+/* Focus First Dashboard Styles - Enhanced with Dark Mode */
 
 :root {
   --primary: #667eea;
@@ -398,9 +398,13 @@ header {
   position: relative;
   height: 350px;
   padding: 20px;
+  width: 100%;
+  min-height: 300px;
 }
 
 #focusTimeChart {
+  width: 100% !important;
+  height: 100% !important;
   max-height: 350px;
 }
 

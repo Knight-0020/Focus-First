@@ -1,4 +1,4 @@
-// FocusShield Dashboard Script
+// Focus First Dashboard Script
 // Enhanced with dark mode, expandable sections, and download functionality
 
 let focusTimeChart = null;
@@ -150,7 +150,7 @@ async function downloadDashboardAsImage() {
     // Convert to JPEG
     const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
     const link = document.createElement('a');
-    link.download = `focusshield-dashboard-${new Date().toISOString().split('T')[0]}.jpg`;
+    link.download = `focus-first-dashboard-${new Date().toISOString().split('T')[0]}.jpg`;
     link.href = dataUrl;
     link.click();
 
@@ -443,7 +443,7 @@ async function personalizeAchievements(unlockedAchievements, baseDefs) {
   if (unlockedAchievements.length === 0) return null;
 
   const prompt = `
-You are FocusShield. Given unlocked achievements, return improved friendly descriptions under 60 chars.
+You are Focus First. Given unlocked achievements, return improved friendly descriptions under 60 chars.
 Unlocked IDs: ${unlockedAchievements.map(a => a.id).join(', ')}
 Base descriptions: ${JSON.stringify(baseDefs)}
 Return JSON object keyed by id with description strings.
@@ -571,7 +571,13 @@ async function loadFocusTimeChart() {
       focusMinutes.push(totalMinutes);
     }
 
-    const ctx = document.getElementById('focusTimeChart').getContext('2d');
+    const canvas = document.getElementById('focusTimeChart');
+    if (!canvas) {
+      console.error('Chart canvas not found');
+      return;
+    }
+    
+    const ctx = canvas.getContext('2d');
     const isDark = document.body.getAttribute('data-theme') === 'dark';
     const textColor = isDark ? '#eaeaea' : '#333';
     const gridColor = isDark ? '#3a3a5c' : '#e0e0e0';
@@ -580,6 +586,9 @@ async function loadFocusTimeChart() {
     if (focusTimeChart) {
       focusTimeChart.destroy();
     }
+
+    // Ensure minimum height for y-axis when all values are 0
+    const maxValue = Math.max(...focusMinutes, 30);
 
     focusTimeChart = new Chart(ctx, {
       type: 'bar',
@@ -591,12 +600,14 @@ async function loadFocusTimeChart() {
           backgroundColor: isDark ? 'rgba(124, 141, 255, 0.6)' : 'rgba(102, 126, 234, 0.6)',
           borderColor: primaryColor,
           borderWidth: 2,
-          borderRadius: 8
+          borderRadius: 8,
+          barThickness: 'flex',
+          maxBarThickness: 50
         }]
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         plugins: {
           legend: {
             display: false
@@ -608,7 +619,12 @@ async function loadFocusTimeChart() {
             borderColor: primaryColor,
             borderWidth: 1,
             padding: 12,
-            cornerRadius: 8
+            cornerRadius: 8,
+            callbacks: {
+              label: function(context) {
+                return context.parsed.y + ' minutes';
+              }
+            }
           }
         },
         scales: {
@@ -616,21 +632,23 @@ async function loadFocusTimeChart() {
             ticks: {
               color: textColor,
               font: {
-                size: 12
+                size: 12,
+                weight: '500'
               }
             },
             grid: {
-              color: gridColor,
-              drawBorder: false
+              display: false
             }
           },
           y: {
             beginAtZero: true,
+            max: maxValue,
             ticks: {
               color: textColor,
               font: {
                 size: 12
-              }
+              },
+              stepSize: Math.ceil(maxValue / 5)
             },
             grid: {
               color: gridColor,

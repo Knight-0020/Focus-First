@@ -1,7 +1,7 @@
-// FocusShield IndexedDB Helper Module
+// Focus First IndexedDB Helper Module
 // Provides Promise-based interface for all database operations
 
-const DB_NAME = 'focusshieldDB';
+const DB_NAME = 'focusfirstDB';
 const DB_VERSION = 1;
 
 // Object store names

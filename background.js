@@ -1,4 +1,4 @@
-// FocusShield Background Service Worker
+// Focus First Background Service Worker
 // Handles: tab tracking, Focus Mode, notifications, alarms
 
 // Import IndexedDB helper functions
@@ -12,12 +12,12 @@ let currentFocusSession = null;
 
 // Initialize on extension install/startup
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('FocusShield installed');
+  console.log('Focus First installed');
   initializeDB();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  console.log('FocusShield started');
+  console.log('Focus First started');
   initializeDB();
   loadFocusSessionState();
 });

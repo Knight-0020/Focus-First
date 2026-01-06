@@ -1,4 +1,4 @@
-// FocusShield Options Script
+// Focus First Options Script
 // Manages blocklist and settings
 
 const PRESET_DOMAINS = [
@@ -14,10 +14,44 @@ const PRESET_DOMAINS = [
 
 // Initialize options page
 document.addEventListener('DOMContentLoaded', async () => {
+  await loadSettings();
   setupEventListeners();
   await loadBlocklist();
-  await loadSettings();
 });
+
+// Apply theme to page
+function applyTheme(isDark) {
+  document.body.setAttribute('data-theme', isDark ? 'dark' : 'light');
+  updateThemeIcon(isDark);
+  
+  const darkModeToggle = document.getElementById('darkModeToggle');
+  if (darkModeToggle) {
+    darkModeToggle.checked = isDark;
+  }
+}
+
+// Update theme icon
+function updateThemeIcon(isDark) {
+  const themeIcon = document.querySelector('.theme-icon');
+  if (themeIcon) {
+    themeIcon.textContent = isDark ? '☀️' : '🌙';
+  }
+}
+
+// Toggle theme (header button)
+async function toggleTheme() {
+  const currentTheme = document.body.getAttribute('data-theme');
+  const isDark = currentTheme !== 'dark';
+  applyTheme(isDark);
+  
+  try {
+    const settings = await getSettings();
+    settings.darkMode = isDark;
+    await saveSettings(settings);
+  } catch (error) {
+    console.error('Error saving theme:', error);
+  }
+}
 
 // Setup event listeners
 function setupEventListeners() {
@@ -26,6 +60,28 @@ function setupEventListeners() {
   const enableNotifications = document.getElementById('enableNotifications');
   const resetDataBtn = document.getElementById('resetDataBtn');
   const backToPopup = document.getElementById('backToPopup');
+  const themeToggle = document.getElementById('themeToggle');
+  const darkModeToggle = document.getElementById('darkModeToggle');
+
+  // Theme toggle button (header icon)
+  if (themeToggle) {
+    themeToggle.addEventListener('click', toggleTheme);
+  }
+
+  // Dark mode toggle switch
+  if (darkModeToggle) {
+    darkModeToggle.addEventListener('change', async () => {
+      const isDark = darkModeToggle.checked;
+      applyTheme(isDark);
+      try {
+        const settings = await getSettings();
+        settings.darkMode = isDark;
+        await saveSettings(settings);
+      } catch (error) {
+        console.error('Error saving theme:', error);
+      }
+    });
+  }
 
   // Add domain
   addDomainBtn.addEventListener('click', async () => {
@@ -184,7 +240,15 @@ async function loadSettings() {
   try {
     const settings = await getSettings();
     const enableNotifications = document.getElementById('enableNotifications');
-    enableNotifications.checked = settings.enableNotifications !== false; // Default to true
+    const darkModeToggle = document.getElementById('darkModeToggle');
+    
+    if (enableNotifications) {
+      enableNotifications.checked = settings.enableNotifications !== false;
+    }
+    
+    // Load dark mode setting and apply immediately
+    const isDark = settings.darkMode === true;
+    applyTheme(isDark);
   } catch (error) {
     console.error('Error loading settings:', error);
   }
@@ -212,18 +276,19 @@ async function resetAllData() {
     for (const storeName of stores) {
       const transaction = db.transaction([storeName], 'readwrite');
       const objectStore = transaction.objectStore(storeName);
-      await objectStore.clear();
+      objectStore.clear();
     }
 
     // Reset settings to defaults
     const defaultSettings = {
       blocklist: [],
-      enableNotifications: true
+      enableNotifications: true,
+      darkMode: false
     };
     await saveSettings(defaultSettings);
+    applyTheme(false);
   } catch (error) {
     console.error('Error resetting data:', error);
     throw error;
   }
 }
-

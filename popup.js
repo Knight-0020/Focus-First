@@ -1,4 +1,4 @@
-// FocusShield Popup Script
+// Focus First Popup Script
 // Enhanced Pomodoro Timer with Dark Mode Support
 
 let focusStatusInterval = null;
