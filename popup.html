@@ -50,7 +50,7 @@
         <button id="stopFocusBtn" class="btn btn-danger btn-circle hidden" title="Stop">
           <span class="btn-icon">⏹</span>
         </button>
-        <button id="skipBtn" class="btn btn-secondary btn-circle hidden" title="Skip">
+        <button id="skipBtn" class="btn btn-secondary btn-circle hidden" title="Skip / Next">
           <span class="btn-icon">⏭</span>
         </button>
       </div>
@@ -67,6 +67,14 @@
     </div>
 
     <div id="sessionControls" class="controls-section">
+      <div class="duration-selector">
+        <label for="modeSelect">Mode:</label>
+        <select id="modeSelect">
+          <option value="timer">Timer</option>
+          <option value="stopwatch">Stopwatch</option>
+        </select>
+      </div>
+
       <div class="duration-selector">
         <label for="durationSelect">Focus Duration:</label>
         <select id="durationSelect">
@@ -118,6 +126,19 @@
     <div class="links-section">
       <button id="openDashboard" class="btn btn-link">📊 Dashboard</button>
       <button id="openOptions" class="btn btn-link">⚙️ Settings</button>
+    </div>
+
+    <div class="links-section">
+      <div style="display:flex;flex-direction:column;gap:6px;flex:1">
+        <strong style="font-size:12px;color:var(--text-secondary)">White noise</strong>
+        <select id="whiteNoiseSelect" style="width:100%">
+          <option value="off">Off</option>
+          <option value="rain">Rain</option>
+          <option value="waves">Ocean Waves</option>
+          <option value="fan">Fan</option>
+        </select>
+        <small style="color:var(--text-muted)">Place mp3 files in /sounds and name them rain.mp3, waves.mp3, fan.mp3. Reload the extension after adding.</small>
+      </div>
     </div>
   </div>
   <script src="db.js"></script>

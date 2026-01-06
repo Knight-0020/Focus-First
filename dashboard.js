@@ -402,6 +402,16 @@ async function loadAchievements() {
 
     const unlockedAchievements = achievements.filter(a => a.unlocked);
     
+    // Optional: personalize achievement blurbs with Groq API if key provided via localStorage.groq_api_key
+    try {
+      const personalized = await personalizeAchievements(unlockedAchievements, achievementDefinitions);
+      if (personalized) {
+        achievementDefinitions = personalized;
+      }
+    } catch (err) {
+      console.warn('Personalization skipped:', err?.message);
+    }
+
     if (unlockedAchievements.length === 0) {
       achievementsList.innerHTML = '<p class="empty-state">No achievements unlocked yet</p>';
       return;
@@ -424,6 +434,54 @@ async function loadAchievements() {
   } catch (error) {
     console.error('Error loading achievements:', error);
   }
+}
+
+// Personalize achievements using Groq (optional)
+async function personalizeAchievements(unlockedAchievements, baseDefs) {
+  const groqKey = window.localStorage.getItem('groq_api_key');
+  if (!groqKey) return null;
+  if (unlockedAchievements.length === 0) return null;
+
+  const prompt = `
+You are FocusShield. Given unlocked achievements, return improved friendly descriptions under 60 chars.
+Unlocked IDs: ${unlockedAchievements.map(a => a.id).join(', ')}
+Base descriptions: ${JSON.stringify(baseDefs)}
+Return JSON object keyed by id with description strings.
+`;
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${groqKey}`
+    },
+    body: JSON.stringify({
+      model: 'mixtral-8x7b-32768',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7
+    })
+  });
+
+  if (!res.ok) throw new Error('Groq API error');
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) return null;
+
+  let parsed = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    console.warn('Failed to parse Groq response; using base definitions');
+    return null;
+  }
+
+  const merged = { ...baseDefs };
+  Object.entries(parsed).forEach(([id, desc]) => {
+    if (merged[id]) {
+      merged[id].description = desc;
+    }
+  });
+  return merged;
 }
 
 // Load productivity insights

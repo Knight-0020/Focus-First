@@ -9,7 +9,11 @@ let pomodoroState = {
   totalSessions: 4,
   sessionType: 'focus', // 'focus', 'shortBreak', 'longBreak'
   remainingSeconds: 25 * 60,
-  totalSeconds: 25 * 60
+  totalSeconds: 25 * 60,
+  mode: 'timer', // 'timer' | 'stopwatch'
+  timerInterval: null,
+  stopwatchSeconds: 0,
+  isBreak: false
 };
 
 // Initialize popup
@@ -64,6 +68,7 @@ async function toggleTheme() {
 function setupEventListeners() {
   const durationSelect = document.getElementById('durationSelect');
   const customDurationInput = document.getElementById('customDurationInput');
+  const modeSelect = document.getElementById('modeSelect');
   const startBtn = document.getElementById('startFocusBtn');
   const pauseBtn = document.getElementById('pauseFocusBtn');
   const stopBtn = document.getElementById('stopFocusBtn');
@@ -71,9 +76,17 @@ function setupEventListeners() {
   const openDashboard = document.getElementById('openDashboard');
   const openOptions = document.getElementById('openOptions');
   const themeToggle = document.getElementById('themeToggle');
+  const whiteNoiseSelect = document.getElementById('whiteNoiseSelect');
 
   // Theme toggle
   themeToggle.addEventListener('click', toggleTheme);
+
+  // Mode selector
+  modeSelect.addEventListener('change', () => {
+    pomodoroState.mode = modeSelect.value;
+    resetTimerState();
+    updateUIState();
+  });
 
   // Duration selector
   durationSelect.addEventListener('change', () => {
@@ -103,9 +116,7 @@ function setupEventListeners() {
 
   // Stop Focus Mode
   stopBtn.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to stop the current session?')) {
-      await stopFocusMode();
-    }
+    await stopFocusMode(true);
   });
 
   // Skip to next session
@@ -123,6 +134,11 @@ function setupEventListeners() {
   openOptions.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
     window.close();
+  });
+
+  // White noise
+  whiteNoiseSelect.addEventListener('change', () => {
+    handleWhiteNoise(whiteNoiseSelect.value);
   });
 }
 
@@ -161,6 +177,11 @@ async function startFocusMode() {
   const duration = getDurationMinutes();
   
   try {
+    if (pomodoroState.mode === 'stopwatch') {
+      startStopwatch();
+      return;
+    }
+
     const response = await chrome.runtime.sendMessage({
       action: 'startFocusMode',
       duration: duration
@@ -172,8 +193,8 @@ async function startFocusMode() {
       pomodoroState.sessionType = 'focus';
       pomodoroState.totalSeconds = duration * 60;
       pomodoroState.remainingSeconds = duration * 60;
+      startLocalCountdown();
       updateUIState();
-      await loadFocusStatus();
     } else {
       alert('Failed to start Focus Mode: ' + (response.error || 'Unknown error'));
     }
@@ -186,10 +207,13 @@ async function startFocusMode() {
 async function pauseFocusMode() {
   pomodoroState.isPaused = true;
   pomodoroState.isRunning = false;
+  clearInterval(pomodoroState.timerInterval);
   updateUIState();
   
   try {
-    await chrome.runtime.sendMessage({ action: 'pauseFocusMode' });
+    if (pomodoroState.mode === 'timer') {
+      await chrome.runtime.sendMessage({ action: 'pauseFocusMode' });
+    }
   } catch (error) {
     console.error('Error pausing:', error);
   }
@@ -199,26 +223,33 @@ async function pauseFocusMode() {
 async function resumeFocusMode() {
   pomodoroState.isPaused = false;
   pomodoroState.isRunning = true;
+  if (pomodoroState.mode === 'stopwatch') {
+    startStopwatch(true);
+  } else {
+    startLocalCountdown();
+  }
   updateUIState();
   
   try {
-    await chrome.runtime.sendMessage({ action: 'resumeFocusMode' });
+    if (pomodoroState.mode === 'timer') {
+      await chrome.runtime.sendMessage({ action: 'resumeFocusMode' });
+    }
   } catch (error) {
     console.error('Error resuming:', error);
   }
 }
 
 // Stop Focus Mode
-async function stopFocusMode() {
+async function stopFocusMode(confirmStop = false) {
+  if (confirmStop) {
+    const ok = confirm('Stop the session and reset to 00:00?');
+    if (!ok) return;
+  }
   try {
     const response = await chrome.runtime.sendMessage({ action: 'stopFocusMode' });
     
     if (response.success) {
-      pomodoroState.isRunning = false;
-      pomodoroState.isPaused = false;
-      pomodoroState.sessionType = 'focus';
-      pomodoroState.remainingSeconds = getDurationMinutes() * 60;
-      pomodoroState.totalSeconds = pomodoroState.remainingSeconds;
+      resetTimerState(true);
       updateUIState();
       await loadFocusStatus();
     }
@@ -229,24 +260,32 @@ async function stopFocusMode() {
 
 // Skip to next session
 async function skipSession() {
+  clearInterval(pomodoroState.timerInterval);
+
+  if (pomodoroState.sessionType === 'shortBreak' || pomodoroState.sessionType === 'longBreak') {
+    // End break early and move to next focus
+    pomodoroState.sessionType = 'focus';
+    pomodoroState.isBreak = false;
+    pomodoroState.isRunning = false;
+    pomodoroState.isPaused = false;
+    pomodoroState.currentSession = Math.min(pomodoroState.currentSession + 1, pomodoroState.totalSessions);
+    const minutes = getDurationMinutes();
+    pomodoroState.remainingSeconds = minutes * 60;
+    pomodoroState.totalSeconds = pomodoroState.remainingSeconds;
+    updateTimerDisplay(minutes, 0);
+    updateUIState();
+    updateSessionIndicators();
+    return;
+  }
+
+  // Skip focus -> jump to break
   try {
-    // Stop the active focus session so polling doesn't immediately restore it
     await chrome.runtime.sendMessage({ action: 'stopFocusMode' });
   } catch (error) {
     console.error('Error skipping session:', error);
   }
 
-  // Reset local state to a fresh focus session
-  pomodoroState.isRunning = false;
-  pomodoroState.isPaused = false;
-  pomodoroState.sessionType = 'focus';
-  const minutes = getDurationMinutes();
-  pomodoroState.remainingSeconds = minutes * 60;
-  pomodoroState.totalSeconds = pomodoroState.remainingSeconds;
-
-  updateTimerDisplay(minutes, 0);
-  updateUIState();
-  updateSessionIndicators();
+  startBreakCountdown();
 }
 
 // Update UI state based on pomodoro state
@@ -265,7 +304,7 @@ function updateUIState() {
     pauseBtn.classList.remove('hidden');
     stopBtn.classList.remove('hidden');
     skipBtn.classList.remove('hidden');
-    statusText.textContent = 'Running';
+    statusText.textContent = pomodoroState.sessionType === 'focus' ? (pomodoroState.mode === 'stopwatch' ? 'Stopwatch running' : 'Running') : 'Break';
     durationSelect.disabled = true;
     pomodoroSection.classList.add('running');
     pomodoroSection.classList.remove('paused', 'ready');
@@ -322,6 +361,8 @@ function updateSessionIndicators() {
 
 // Load current Focus Mode status
 async function loadFocusStatus() {
+  // Ignore background status while on stopwatch or break-only local flows
+  if (pomodoroState.mode === 'stopwatch' || pomodoroState.isBreak) return;
   try {
     const response = await chrome.runtime.sendMessage({ action: 'getFocusStatus' });
     
@@ -405,12 +446,14 @@ async function calculateStreak(sessions) {
 // Update timer display
 function updateTimerDisplay(minutes, seconds) {
   const timeRemaining = document.getElementById('timeRemaining');
-  const mins = String(minutes).padStart(2, '0');
-  const secs = String(seconds).padStart(2, '0');
-  timeRemaining.textContent = `${mins}:${secs}`;
+  const mins = Math.floor(minutes);
+  const minStr = String(mins).padStart(2, '0');
+  const secs = Math.floor(seconds);
+  const secStr = String(secs).padStart(2, '0');
+  timeRemaining.textContent = `${minStr}:${secStr}`;
   
   // Add pulse animation when time is running low (less than 5 minutes)
-  if (pomodoroState.isRunning && minutes < 5 && minutes > 0) {
+  if (pomodoroState.isRunning && pomodoroState.mode === 'timer' && minutes < 5 && minutes > 0) {
     timeRemaining.classList.add('warning');
   } else {
     timeRemaining.classList.remove('warning');
@@ -428,9 +471,14 @@ function updateProgressRing() {
   
   const radius = 90;
   const circumference = 2 * Math.PI * radius;
-  const progress = pomodoroState.remainingSeconds / pomodoroState.totalSeconds;
+  let progress = pomodoroState.remainingSeconds / pomodoroState.totalSeconds;
+  if (pomodoroState.mode === 'stopwatch') {
+    // For stopwatch, show looping progress every 60 minutes
+    const cycle = Math.max(1, pomodoroState.stopwatchSeconds / 60);
+    progress = (pomodoroState.stopwatchSeconds % (60 * 60)) / (60 * 60);
+  }
   const offset = circumference * (1 - progress);
-  const percentage = Math.round(progress * 100);
+  const percentage = pomodoroState.mode === 'stopwatch' ? Math.round(progress * 100) : Math.round(progress * 100);
   
   circle.style.strokeDasharray = circumference;
   circle.style.strokeDashoffset = offset;
@@ -454,6 +502,116 @@ function startStatusPolling() {
   focusStatusInterval = setInterval(async () => {
     await loadFocusStatus();
   }, 1000);
+}
+
+// Local countdown handler
+function startLocalCountdown() {
+  clearInterval(pomodoroState.timerInterval);
+  pomodoroState.isRunning = true;
+  pomodoroState.isPaused = false;
+
+  pomodoroState.timerInterval = setInterval(async () => {
+    pomodoroState.remainingSeconds -= 1;
+    if (pomodoroState.remainingSeconds <= 0) {
+      clearInterval(pomodoroState.timerInterval);
+      pomodoroState.timerInterval = null;
+      if (pomodoroState.sessionType === 'focus') {
+        // finalize focus session
+        await stopFocusMode();
+        promptForBreak();
+      } else {
+        // break finished
+        pomodoroState.sessionType = 'focus';
+        pomodoroState.isBreak = false;
+        pomodoroState.isRunning = false;
+        pomodoroState.isPaused = false;
+        const minutes = getDurationMinutes();
+        pomodoroState.remainingSeconds = minutes * 60;
+        pomodoroState.totalSeconds = pomodoroState.remainingSeconds;
+        updateTimerDisplay(minutes, 0);
+        updateUIState();
+        updateSessionIndicators();
+      }
+    } else {
+      updateTimerDisplay(Math.floor(pomodoroState.remainingSeconds / 60), pomodoroState.remainingSeconds % 60);
+      updateUIState();
+    }
+  }, 1000);
+}
+
+function startBreakCountdown() {
+  const breaks = getBreakDurations();
+  const useLong = pomodoroState.currentSession >= pomodoroState.totalSessions;
+  const minutes = useLong ? breaks.longBreak : breaks.shortBreak;
+  pomodoroState.sessionType = useLong ? 'longBreak' : 'shortBreak';
+  pomodoroState.isBreak = true;
+  pomodoroState.isRunning = true;
+  pomodoroState.isPaused = false;
+  pomodoroState.totalSeconds = minutes * 60;
+  pomodoroState.remainingSeconds = minutes * 60;
+  startLocalCountdown();
+  updateUIState();
+  updateSessionIndicators();
+}
+
+function promptForBreak() {
+  const wantsBreak = confirm('Focus complete! Start a break?');
+  if (wantsBreak) {
+    startBreakCountdown();
+  } else {
+    resetTimerState();
+    updateUIState();
+  }
+}
+
+function resetTimerState() {
+  clearInterval(pomodoroState.timerInterval);
+  pomodoroState.timerInterval = null;
+  pomodoroState.isRunning = false;
+  pomodoroState.isPaused = false;
+  pomodoroState.sessionType = 'focus';
+  pomodoroState.isBreak = false;
+  pomodoroState.stopwatchSeconds = 0;
+  const minutes = getDurationMinutes();
+  pomodoroState.totalSeconds = minutes * 60;
+  pomodoroState.remainingSeconds = 0; // reset display to 00:00
+  updateTimerDisplay(0, 0);
+  updateProgressRing();
+}
+
+// Stopwatch support
+function startStopwatch(resume = false) {
+  clearInterval(pomodoroState.timerInterval);
+  if (!resume) {
+    pomodoroState.stopwatchSeconds = 0;
+    pomodoroState.remainingSeconds = 0;
+    pomodoroState.totalSeconds = 60 * 60; // display cycle
+  }
+  pomodoroState.isRunning = true;
+  pomodoroState.isPaused = false;
+  pomodoroState.sessionType = 'focus';
+  pomodoroState.timerInterval = setInterval(() => {
+    pomodoroState.stopwatchSeconds += 1;
+    updateTimerDisplay(Math.floor(pomodoroState.stopwatchSeconds / 60), pomodoroState.stopwatchSeconds % 60);
+    updateProgressRing();
+  }, 1000);
+  updateUIState();
+}
+
+let whiteNoiseAudio = null;
+function handleWhiteNoise(value) {
+  if (whiteNoiseAudio) {
+    whiteNoiseAudio.pause();
+    whiteNoiseAudio = null;
+  }
+  if (value === 'off') return;
+  const src = `sounds/${value}.mp3`;
+  whiteNoiseAudio = new Audio(src);
+  whiteNoiseAudio.loop = true;
+  whiteNoiseAudio.volume = 0.35;
+  whiteNoiseAudio.play().catch(() => {
+    alert('Add your white noise file to /sounds and reload the extension.');
+  });
 }
 
 // Cleanup on popup close
