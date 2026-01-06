@@ -76,7 +76,6 @@ function setupEventListeners() {
   const openDashboard = document.getElementById('openDashboard');
   const openOptions = document.getElementById('openOptions');
   const themeToggle = document.getElementById('themeToggle');
-  const whiteNoiseSelect = document.getElementById('whiteNoiseSelect');
 
   // Theme toggle
   themeToggle.addEventListener('click', toggleTheme);
@@ -134,11 +133,6 @@ function setupEventListeners() {
   openOptions.addEventListener('click', () => {
     chrome.runtime.openOptionsPage();
     window.close();
-  });
-
-  // White noise
-  whiteNoiseSelect.addEventListener('change', () => {
-    handleWhiteNoise(whiteNoiseSelect.value);
   });
 }
 
@@ -596,32 +590,6 @@ function startStopwatch(resume = false) {
     updateProgressRing();
   }, 1000);
   updateUIState();
-}
-
-let whiteNoiseAudio = null;
-let whiteNoiseVolume = 1.0; // Maximum volume 100%
-
-function handleWhiteNoise(value) {
-  if (whiteNoiseAudio) {
-    whiteNoiseAudio.pause();
-    whiteNoiseAudio = null;
-  }
-  if (value === 'off') return;
-  const src = `sounds/${value}.mp3`;
-  whiteNoiseAudio = new Audio(src);
-  whiteNoiseAudio.loop = true;
-  whiteNoiseAudio.volume = whiteNoiseVolume;
-  whiteNoiseAudio.play().catch(() => {
-    alert('Add your white noise file to /sounds and reload the extension.');
-  });
-}
-
-// Set white noise volume (0.0 to 1.0)
-function setWhiteNoiseVolume(volume) {
-  whiteNoiseVolume = volume;
-  if (whiteNoiseAudio) {
-    whiteNoiseAudio.volume = volume;
-  }
 }
 
 // Cleanup on popup close

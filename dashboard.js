@@ -7,6 +7,7 @@ let focusTimeChart = null;
 document.addEventListener('DOMContentLoaded', async () => {
   await loadTheme();
   setupEventListeners();
+  setupWhiteNoisePlayer();
   await loadDashboardData();
 });
 
@@ -662,3 +663,85 @@ async function loadFocusTimeChart() {
     console.error('Error loading focus time chart:', error);
   }
 }
+
+// ==================== WHITE NOISE PLAYER ====================
+
+let whiteNoiseAudio = null;
+let whiteNoiseVolume = 1.0;
+
+function setupWhiteNoisePlayer() {
+  const noiseSelect = document.getElementById('whiteNoiseSelect');
+  const volumeSlider = document.getElementById('volumeSlider');
+  const volumeDisplay = document.getElementById('volumeDisplay');
+  
+  if (noiseSelect) {
+    noiseSelect.addEventListener('change', (e) => {
+      handleWhiteNoise(e.target.value);
+    });
+  }
+  
+  if (volumeSlider) {
+    volumeSlider.addEventListener('input', (e) => {
+      const volume = parseInt(e.target.value) / 100;
+      setWhiteNoiseVolume(volume);
+      if (volumeDisplay) {
+        volumeDisplay.textContent = e.target.value + '%';
+      }
+    });
+  }
+}
+
+function handleWhiteNoise(value) {
+  const noiseStatus = document.getElementById('noiseStatus');
+  
+  if (whiteNoiseAudio) {
+    whiteNoiseAudio.pause();
+    whiteNoiseAudio = null;
+  }
+  
+  if (value === 'off') {
+    updateNoiseStatus('🔇', 'No sound playing');
+    return;
+  }
+  
+  const src = chrome.runtime.getURL(`sounds/${value}.mp3`);
+  whiteNoiseAudio = new Audio(src);
+  whiteNoiseAudio.loop = true;
+  whiteNoiseAudio.volume = whiteNoiseVolume;
+  
+  whiteNoiseAudio.play()
+    .then(() => {
+      const soundNames = {
+        'rain': '🌧️ Rain',
+        'waves': '🌊 Ocean Waves', 
+        'fan': '💨 Fan'
+      };
+      updateNoiseStatus('🔊', `Playing: ${soundNames[value] || value}`);
+    })
+    .catch(() => {
+      updateNoiseStatus('⚠️', 'File not found - add to /sounds folder');
+      alert('Add your white noise file to /sounds and reload the extension.');
+    });
+}
+
+function updateNoiseStatus(icon, text) {
+  const statusIcon = document.querySelector('.noise-status .status-icon');
+  const statusText = document.querySelector('.noise-status .status-text');
+  if (statusIcon) statusIcon.textContent = icon;
+  if (statusText) statusText.textContent = text;
+}
+
+function setWhiteNoiseVolume(volume) {
+  whiteNoiseVolume = volume;
+  if (whiteNoiseAudio) {
+    whiteNoiseAudio.volume = volume;
+  }
+}
+
+// Cleanup on page close
+window.addEventListener('beforeunload', () => {
+  if (whiteNoiseAudio) {
+    whiteNoiseAudio.pause();
+    whiteNoiseAudio = null;
+  }
+});

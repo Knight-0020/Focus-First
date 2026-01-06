@@ -134,6 +134,36 @@
       </div>
     </div>
 
+    <!-- White Noise Player -->
+    <div class="section white-noise-section">
+      <div class="section-header">
+        <h2>🎧 Ambient Sounds</h2>
+      </div>
+      <div class="white-noise-player">
+        <div class="noise-controls">
+          <div class="noise-select-wrapper">
+            <label for="whiteNoiseSelect">Sound:</label>
+            <select id="whiteNoiseSelect">
+              <option value="off">Off</option>
+              <option value="rain">🌧️ Rain</option>
+              <option value="waves">🌊 Ocean Waves</option>
+              <option value="fan">💨 Fan</option>
+            </select>
+          </div>
+          <div class="volume-wrapper">
+            <label for="volumeSlider">Volume:</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="100">
+            <span id="volumeDisplay">100%</span>
+          </div>
+        </div>
+        <div class="noise-status" id="noiseStatus">
+          <span class="status-icon">🔇</span>
+          <span class="status-text">No sound playing</span>
+        </div>
+        <!-- <p class="noise-info">Place mp3 files in /sounds folder (rain.mp3, waves.mp3, fan.mp3). Reload extension after adding.</p> -->
+      </div>
+    </div>
+
     <!-- Top Sites -->
     <div class="section expandable-section" data-expanded="true">
       <div class="section-header">

@@ -493,6 +493,13 @@ TIMER STATES:
   - remainingSeconds: How many seconds left
   - totalSeconds: Original duration (for progress calculation)
 
+
+┌─────────────┐     ┌──────────┐     ┌──────────────┐
+│   popup.js  │────▶│  db.js   │────▶│  IndexedDB   │
+│ dashboard.js│◀────│ (helper) │◀────│ focusfirstDB │
+│  options.js │     └──────────┘     └──────────────┘
+└─────────────┘
+
 ================================================================================
                               END OF GUIDE
 ================================================================================

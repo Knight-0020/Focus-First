@@ -529,6 +529,135 @@ header {
   font-size: 20px;
 }
 
+/* ==================== WHITE NOISE PLAYER ==================== */
+
+.white-noise-section {
+  background: var(--gradient);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 25px;
+  color: white;
+}
+
+.white-noise-section .section-header h2 {
+  color: white;
+  margin-bottom: 20px;
+}
+
+.white-noise-player {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.noise-controls {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.noise-select-wrapper,
+.volume-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.noise-select-wrapper label,
+.volume-wrapper label {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.white-noise-section select {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  min-width: 160px;
+  transition: all 0.2s ease;
+}
+
+.white-noise-section select:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.white-noise-section select:focus {
+  outline: none;
+  border-color: white;
+}
+
+.white-noise-section select option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.volume-wrapper input[type="range"] {
+  width: 120px;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.volume-wrapper input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.volume-wrapper input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#volumeDisplay {
+  font-weight: 600;
+  min-width: 45px;
+  text-align: center;
+}
+
+.noise-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.noise-status .status-icon {
+  font-size: 20px;
+}
+
+.noise-status .status-text {
+  font-weight: 500;
+}
+
+.noise-info {
+  font-size: 12px;
+  opacity: 0.8;
+  margin-top: 5px;
+}
+
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: 1fr;
@@ -547,5 +676,11 @@ header {
   .achievements-list,
   .insights-list {
     grid-template-columns: 1fr;
+  }
+  
+  .noise-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
   }
 }
