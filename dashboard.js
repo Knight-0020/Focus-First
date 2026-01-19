@@ -39,7 +39,7 @@ async function toggleTheme() {
   document.body.setAttribute('data-theme', newTheme);
   updateThemeIcon(newTheme === 'dark');
   updateChartTheme(newTheme === 'dark');
-  
+
   // Save preference
   try {
     const settings = await getSettings();
@@ -55,7 +55,7 @@ function updateChartTheme(isDark) {
   if (focusTimeChart) {
     const textColor = isDark ? '#eaeaea' : '#333';
     const gridColor = isDark ? '#3a3a5c' : '#e0e0e0';
-    
+
     focusTimeChart.options.scales.x.ticks.color = textColor;
     focusTimeChart.options.scales.y.ticks.color = textColor;
     focusTimeChart.options.scales.x.grid.color = gridColor;
@@ -68,7 +68,6 @@ function updateChartTheme(isDark) {
 function setupEventListeners() {
   const refreshBtn = document.getElementById('refreshBtn');
   const themeToggle = document.getElementById('themeToggle');
-  const downloadBtn = document.getElementById('downloadBtn');
 
   refreshBtn.addEventListener('click', async () => {
     refreshBtn.disabled = true;
@@ -80,7 +79,15 @@ function setupEventListeners() {
 
   themeToggle.addEventListener('click', toggleTheme);
 
-  downloadBtn.addEventListener('click', downloadDashboardAsImage);
+  const pdfBtn = document.getElementById('pdfBtn');
+  if (pdfBtn) {
+    pdfBtn.addEventListener('click', downloadDashboardAsPDF);
+  }
+
+  const emailBtn = document.getElementById('emailBtn');
+  if (emailBtn) {
+    emailBtn.addEventListener('click', sendEmailReport);
+  }
 
   // Expandable stat cards
   document.querySelectorAll('.stat-card.expandable').forEach(card => {
@@ -90,7 +97,7 @@ function setupEventListeners() {
       card.setAttribute('data-expanded', !isExpanded);
       const details = card.querySelector('.stat-details');
       const icon = expandBtn.querySelector('.expand-icon');
-      
+
       if (!isExpanded) {
         details.classList.remove('hidden');
         icon.textContent = '▲';
@@ -111,7 +118,7 @@ function setupEventListeners() {
       section.setAttribute('data-expanded', !isExpanded);
       const content = section.querySelector('.section-content');
       const icon = expandBtn.querySelector('.expand-icon');
-      
+
       if (!isExpanded) {
         content.style.display = 'block';
         icon.textContent = '▲';
@@ -125,45 +132,103 @@ function setupEventListeners() {
   });
 }
 
-// Download dashboard as JPEG
-async function downloadDashboardAsImage() {
+// Download dashboard as PDF
+// Download dashboard as PDF
+async function downloadDashboardAsPDF() {
   try {
-    const downloadBtn = document.getElementById('downloadBtn');
-    downloadBtn.disabled = true;
-    downloadBtn.textContent = '⏳ Exporting...';
+    const pdfBtn = document.getElementById('pdfBtn');
+    pdfBtn.disabled = true;
+    pdfBtn.textContent = '⏳ Saving...';
 
-    // Wait for html2canvas to load
-    if (typeof html2canvas === 'undefined') {
-      alert('Export feature is loading. Please try again in a moment.');
-      downloadBtn.disabled = false;
-      downloadBtn.innerHTML = '<span class="btn-icon">📷</span> Export';
-      return;
-    }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
 
-    const element = document.getElementById('dashboardContent');
-    const canvas = await html2canvas(element, {
+    const dashboardElement = document.getElementById('dashboardContent');
+    const insightsElement = document.getElementById('insightsSection');
+
+    // --- PAGE 1: Main Dashboard (excluding Insights) ---
+    // Capture dashboard but ignore the insights section
+    const canvasMain = await html2canvas(dashboardElement, {
       backgroundColor: document.body.getAttribute('data-theme') === 'dark' ? '#1a1a2e' : '#f5f7fa',
       scale: 2,
       logging: false,
-      useCORS: true
+      useCORS: true,
+      ignoreElements: (element) => element.id === 'insightsSection'
     });
 
-    // Convert to JPEG
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-    const link = document.createElement('a');
-    link.download = `focus-first-dashboard-${new Date().toISOString().split('T')[0]}.jpg`;
-    link.href = dataUrl;
-    link.click();
+    const imgDataMain = canvasMain.toDataURL('image/jpeg', 0.95);
+    const imgHeightMain = (canvasMain.height * contentWidth) / canvasMain.width;
 
-    downloadBtn.disabled = false;
-    downloadBtn.innerHTML = '<span class="btn-icon">📷</span> Export';
+    doc.addImage(imgDataMain, 'JPEG', margin, margin, contentWidth, imgHeightMain);
+
+    // --- PAGE 2: Productivity Insights ---
+    if (insightsElement) {
+      // Ensure it's visible for capture
+      const canvasInsights = await html2canvas(insightsElement, {
+        backgroundColor: document.body.getAttribute('data-theme') === 'dark' ? '#1a1a2e' : '#f5f7fa',
+        scale: 2,
+        logging: false,
+        useCORS: true
+      });
+
+      const imgDataInsights = canvasInsights.toDataURL('image/jpeg', 0.95);
+      const imgHeightInsights = (canvasInsights.height * contentWidth) / canvasInsights.width;
+
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.text("Productivity Insights", margin, margin + 10);
+
+      doc.addImage(imgDataInsights, 'JPEG', margin, margin + 20, contentWidth, imgHeightInsights);
+    }
+
+    doc.save(`focus-first-report-${new Date().toISOString().split('T')[0]}.pdf`);
+
+    pdfBtn.disabled = false;
+    pdfBtn.innerHTML = '<span class="btn-icon">📄</span> Save PDF';
   } catch (error) {
-    console.error('Error downloading dashboard:', error);
-    alert('Failed to export dashboard. Please try again.');
-    const downloadBtn = document.getElementById('downloadBtn');
-    downloadBtn.disabled = false;
-    downloadBtn.innerHTML = '<span class="btn-icon">📷</span> Export';
+    console.error('Error saving PDF:', error);
+    alert('Failed to save PDF.');
+    const pdfBtn = document.getElementById('pdfBtn');
+    if (pdfBtn) {
+      pdfBtn.disabled = false;
+      pdfBtn.innerHTML = '<span class="btn-icon">📄</span> Save PDF';
+    }
   }
+}
+
+// Send Email Report (via Gmail)
+async function sendEmailReport() {
+  const emailInput = document.getElementById('emailInput');
+  const email = emailInput.value.trim();
+
+  // Gather stats
+  const totalFocus = document.getElementById('todayFocusTime').textContent || '0 min';
+  const sessions = document.getElementById('todaySessions').textContent || '0';
+  const topDistraction = document.getElementById('topDistraction').textContent || '-';
+  const streak = document.getElementById('streakDays').textContent || '0 days';
+
+  const subject = encodeURIComponent('Focus First Productivity Report');
+  const body = encodeURIComponent(`Here is your latest Focus First report:
+
+📅 Date: ${new Date().toLocaleDateString()}
+
+✅ Today's Focus: ${totalFocus}
+🔄 Sessions Completed: ${sessions}
+🔥 Current Streak: ${streak}
+⚠️ Top Distraction: ${topDistraction}
+
+Keep up the great work!
+- Focus First Extension`);
+
+  // Gmail Compose URL
+  const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
+
+  // Open in new tab
+  window.open(gmailLink, '_blank');
 }
 
 // Load all dashboard data
@@ -193,7 +258,7 @@ async function loadTodayStats() {
     let totalMinutes = 0;
     let distractionCount = 0;
     let longestSession = 0;
-    
+
     sessions.forEach(session => {
       if (session.totalFocusMinutes) {
         totalMinutes += session.totalFocusMinutes;
@@ -203,7 +268,7 @@ async function loadTodayStats() {
     });
 
     const avgSession = sessions.length > 0 ? Math.round(totalMinutes / sessions.length) : 0;
-    const focusScore = sessions.length > 0 
+    const focusScore = sessions.length > 0
       ? Math.max(0, Math.min(100, Math.round(100 - (distractionCount / sessions.length) * 10)))
       : 0;
 
@@ -230,13 +295,13 @@ async function loadTodayStats() {
 
     // Completion rate (sessions that completed vs started)
     const startedSessions = allSessions.length;
-    const completionRate = startedSessions > 0 
+    const completionRate = startedSessions > 0
       ? Math.round((completedSessions.length / startedSessions) * 100)
       : 0;
     document.getElementById('completionRate').textContent = `${completionRate}%`;
 
     // Average distractions
-    const avgDistractions = sessions.length > 0 
+    const avgDistractions = sessions.length > 0
       ? (distractionCount / sessions.length).toFixed(1)
       : 0;
     document.getElementById('avgDistractions').textContent = avgDistractions;
@@ -265,7 +330,7 @@ async function loadStreak() {
     const sessions = await getAllFocusSessions();
     const completedSessions = sessions.filter(s => s.status === 'completed');
     const streak = await calculateStreak(completedSessions);
-    
+
     document.getElementById('streakDays').textContent = `${streak} day${streak !== 1 ? 's' : ''}`;
 
     // Calculate best streak
@@ -299,7 +364,7 @@ async function calculateBestStreak(sessions) {
   });
 
   const sortedDays = Array.from(daysWithSessions).sort((a, b) => b - a);
-  
+
   let bestStreak = 0;
   let currentStreak = 0;
   let expectedDate = sortedDays[0];
@@ -332,7 +397,7 @@ async function calculateStreak(sessions) {
   });
 
   const sortedDays = Array.from(daysWithSessions).sort((a, b) => b - a);
-  
+
   let streak = 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -354,13 +419,13 @@ async function calculateStreak(sessions) {
 async function loadTopSites() {
   try {
     const stats = await getAllDomainStats();
-    
+
     // Sort by totalTimeMs descending
     stats.sort((a, b) => b.totalTimeMs - a.totalTimeMs);
-    
+
     const topSites = stats.slice(0, 5);
     const topSitesList = document.getElementById('topSitesList');
-    
+
     if (topSites.length === 0) {
       topSitesList.innerHTML = '<p class="empty-state">No data yet</p>';
       return;
@@ -369,10 +434,10 @@ async function loadTopSites() {
     topSitesList.innerHTML = topSites.map(stat => {
       const hours = Math.floor(stat.totalTimeMs / (60 * 60 * 1000));
       const minutes = Math.floor((stat.totalTimeMs % (60 * 60 * 1000)) / (60 * 1000));
-      const timeDisplay = hours > 0 
-        ? `${hours}h ${minutes}m` 
+      const timeDisplay = hours > 0
+        ? `${hours}h ${minutes}m`
         : `${minutes}m`;
-      
+
       return `
         <div class="site-item">
           <div class="site-domain">${stat.domain}</div>
@@ -393,7 +458,7 @@ async function loadAchievements() {
   try {
     const achievements = await getAllAchievements();
     const achievementsList = document.getElementById('achievementsList');
-    
+
     const achievementDefinitions = {
       'FIRST_SESSION': { name: 'First Steps', description: 'Complete your first focus session', icon: '🎯' },
       'THREE_SESSIONS_DAY': { name: 'Triple Focus', description: 'Complete 3 focus sessions in one day', icon: '🔥' },
@@ -402,7 +467,7 @@ async function loadAchievements() {
     };
 
     const unlockedAchievements = achievements.filter(a => a.unlocked);
-    
+
     // Optional: personalize achievement blurbs with Groq API if key provided via localStorage.groq_api_key
     try {
       const personalized = await personalizeAchievements(unlockedAchievements, achievementDefinitions);
@@ -550,24 +615,24 @@ async function loadFocusTimeChart() {
   try {
     const sessions = await getAllFocusSessions();
     const completedSessions = sessions.filter(s => s.status === 'completed');
-    
+
     // Get last 7 days
     const days = [];
     const focusMinutes = [];
-    
+
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
       date.setHours(0, 0, 0, 0);
-      
+
       const daySessions = completedSessions.filter(s => {
         const sessionDate = new Date(s.endTime);
         sessionDate.setHours(0, 0, 0, 0);
         return sessionDate.getTime() === date.getTime();
       });
-      
+
       const totalMinutes = daySessions.reduce((sum, s) => sum + (s.totalFocusMinutes || 0), 0);
-      
+
       days.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
       focusMinutes.push(totalMinutes);
     }
@@ -577,13 +642,13 @@ async function loadFocusTimeChart() {
       console.error('Chart canvas not found');
       return;
     }
-    
+
     const ctx = canvas.getContext('2d');
     const isDark = document.body.getAttribute('data-theme') === 'dark';
     const textColor = isDark ? '#eaeaea' : '#333';
     const gridColor = isDark ? '#3a3a5c' : '#e0e0e0';
     const primaryColor = isDark ? '#7c8dff' : '#667eea';
-    
+
     if (focusTimeChart) {
       focusTimeChart.destroy();
     }
@@ -622,7 +687,7 @@ async function loadFocusTimeChart() {
             padding: 12,
             cornerRadius: 8,
             callbacks: {
-              label: function(context) {
+              label: function (context) {
                 return context.parsed.y + ' minutes';
               }
             }
@@ -673,13 +738,13 @@ function setupWhiteNoisePlayer() {
   const noiseSelect = document.getElementById('whiteNoiseSelect');
   const volumeSlider = document.getElementById('volumeSlider');
   const volumeDisplay = document.getElementById('volumeDisplay');
-  
+
   if (noiseSelect) {
     noiseSelect.addEventListener('change', (e) => {
       handleWhiteNoise(e.target.value);
     });
   }
-  
+
   if (volumeSlider) {
     volumeSlider.addEventListener('input', (e) => {
       const volume = parseInt(e.target.value) / 100;
@@ -693,27 +758,27 @@ function setupWhiteNoisePlayer() {
 
 function handleWhiteNoise(value) {
   const noiseStatus = document.getElementById('noiseStatus');
-  
+
   if (whiteNoiseAudio) {
     whiteNoiseAudio.pause();
     whiteNoiseAudio = null;
   }
-  
+
   if (value === 'off') {
     updateNoiseStatus('🔇', 'No sound playing');
     return;
   }
-  
+
   const src = chrome.runtime.getURL(`sounds/${value}.mp3`);
   whiteNoiseAudio = new Audio(src);
   whiteNoiseAudio.loop = true;
   whiteNoiseAudio.volume = whiteNoiseVolume;
-  
+
   whiteNoiseAudio.play()
     .then(() => {
       const soundNames = {
         'rain': '🌧️ Rain',
-        'waves': '🌊 Ocean Waves', 
+        'waves': '🌊 Ocean Waves',
         'fan': '💨 Fan'
       };
       updateNoiseStatus('🔊', `Playing: ${soundNames[value] || value}`);

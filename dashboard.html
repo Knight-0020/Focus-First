@@ -1,13 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Focus First - Dashboard</title>
   <link rel="stylesheet" href="css/dashboard.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="libs/html2canvas.min.js"></script>
+  <script src="libs/jspdf.umd.min.js"></script>
+  <style>
+    .export-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .email-wrapper {
+      display: flex;
+      gap: 5px;
+    }
+
+    .input-small {
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 14px;
+      width: 200px;
+    }
+
+    [data-theme="dark"] .input-small {
+      background: #16213e;
+      border-color: #3a3a5c;
+      color: #fff;
+    }
+  </style>
 </head>
+
 <body>
   <div class="dashboard-wrapper" id="dashboardContent">
     <header>
@@ -16,9 +45,17 @@
         <p class="header-subtitle">Your productivity at a glance</p>
       </div>
       <div class="header-actions">
-        <button id="downloadBtn" class="btn btn-accent" title="Download as Image">
-          <span class="btn-icon">📷</span> Export
-        </button>
+        <div class="export-controls">
+          <button id="pdfBtn" class="btn btn-accent" title="Save as PDF">
+            <span class="btn-icon">📄</span> Save PDF
+          </button>
+          <div class="email-wrapper">
+            <input type="email" id="emailInput" placeholder="Enter email..." class="input-small">
+            <button id="emailBtn" class="btn btn-secondary" title="Send Report">
+              <span class="btn-icon">📧</span> Send
+            </button>
+          </div>
+        </div>
         <button id="themeToggle" class="btn btn-icon-only" title="Toggle Theme">
           <span class="theme-icon">🌙</span>
         </button>
@@ -210,7 +247,7 @@
     </div>
 
     <!-- Productivity Insights -->
-    <div class="section expandable-section" data-expanded="true">
+    <div id="insightsSection" class="section expandable-section" data-expanded="true">
       <div class="section-header">
         <h2>💡 Productivity Insights</h2>
         <button class="expand-btn active" title="Toggle section">
@@ -227,4 +264,5 @@
   <script src="db.js"></script>
   <script src="dashboard.js"></script>
 </body>
+
 </html>

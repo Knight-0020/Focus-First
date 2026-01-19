@@ -1,14 +1,14 @@
 // Focus First Background Service Worker
 // Handles: tab tracking, Focus Mode, notifications, alarms
+// Refactored for Manifest V3 stability and persistence
 
 // Import IndexedDB helper functions
 importScripts('db.js');
 
-// In-memory tracking of open tabs
-const openTabs = new Map(); // tabId -> { domain, openedAt }
-
-// Current Focus Mode state
-let currentFocusSession = null;
+// Constants for storage keys
+const KEY_FOCUS_SESSION = 'currentFocusSession';
+const KEY_STOPWATCH = 'stopwatchState';
+const KEY_TAB_PREFIX = 'tab_timestamp_';
 
 // Initialize on extension install/startup
 chrome.runtime.onInstalled.addListener(() => {
@@ -17,55 +17,86 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  console.log('Focus First started');
+  console.log('Focus First browser startup');
   initializeDB();
-  loadFocusSessionState();
+  // We don't need loadFocusSessionState logic here anymore because we load it on-demand
+  // or via alarm triggers, but we can do a sanity check if needed.
+  verifySessionIntegrity();
 });
 
 // Initialize IndexedDB
 async function initializeDB() {
   try {
-    const db = await openDB();
+    await openDB();
     console.log('IndexedDB initialized');
   } catch (error) {
     console.error('Failed to initialize IndexedDB:', error);
   }
 }
 
-// Load Focus Mode state on startup
-async function loadFocusSessionState() {
-  try {
-    const db = await openDB();
-    const transaction = db.transaction(['focusSessions'], 'readonly');
-    const store = transaction.objectStore('focusSessions');
-    const index = store.index('status');
-    const request = index.getAll('active');
-    
-    request.onsuccess = async (event) => {
-      const activeSessions = event.target.result;
-      if (activeSessions.length > 0) {
-        // Restore the most recent active session
-        const session = activeSessions[activeSessions.length - 1];
-        currentFocusSession = session;
-        
-        // Check if session should have ended
-        const now = Date.now();
-        const endTime = session.startTime + (session.plannedDuration * 60 * 1000);
-        
-        if (now >= endTime) {
-          // Session should have ended, complete it
-          await completeFocusSession(session.id);
-        } else {
-          // Session still active, restore alarm
-          const remainingMs = endTime - now;
-          chrome.alarms.create('focusSessionEnd', { when: Date.now() + remainingMs });
-        }
-      }
-    };
-  } catch (error) {
-    console.error('Failed to load focus session state:', error);
+// --- STATE MANAGEMENT HELPERS ---
+
+// Helper to get current focus session from local storage
+async function getStoredFocusSession() {
+  const result = await chrome.storage.local.get([KEY_FOCUS_SESSION]);
+  return result[KEY_FOCUS_SESSION] || null;
+}
+
+// Helper to set current focus session
+async function setStoredFocusSession(session) {
+  if (session) {
+    await chrome.storage.local.set({ [KEY_FOCUS_SESSION]: session });
+  } else {
+    await chrome.storage.local.remove([KEY_FOCUS_SESSION]);
   }
 }
+
+// Helper to get tab start time from session storage
+async function getTabStartTime(tabId) {
+  try {
+    const key = KEY_TAB_PREFIX + tabId;
+    const result = await chrome.storage.session.get([key]);
+    return result[key] || null;
+  } catch (e) {
+    // Session storage might not be available in some contexts, fallback gracefully
+    return null;
+  }
+}
+
+// Helper to set tab start time
+async function setTabStartTime(tabId, data) {
+  try {
+    const key = KEY_TAB_PREFIX + tabId;
+    await chrome.storage.session.set({ [key]: data });
+  } catch (e) {
+    console.error("Storage session error", e);
+  }
+}
+
+// Helper to remove tab start time
+async function removeTabStartTime(tabId) {
+  try {
+    const key = KEY_TAB_PREFIX + tabId;
+    await chrome.storage.session.remove([key]);
+  } catch (e) {
+    // ignore
+  }
+}
+
+// Helper: Verify session and complete if time passed (handles missed alarms)
+async function verifySessionIntegrity() {
+  const session = await getStoredFocusSession();
+  if (session && session.status === 'active') {
+    const now = Date.now();
+    const endTime = session.startTime + (session.plannedDuration * 60 * 1000);
+    if (now >= endTime) {
+      console.log('Session found expired during integrity check, completing...');
+      await completeFocusSession(session.id);
+    }
+  }
+}
+
+// --- TAB TRACKING ---
 
 // Tab tracking: Record when a tab is created or updated
 chrome.tabs.onCreated.addListener((tab) => {
@@ -85,28 +116,30 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   trackTabClose(tabId);
 });
 
-// Track tab open: record domain and timestamp
-function trackTabOpen(tabId, url) {
+// Track tab open: record domain and timestamp in STORAGE
+async function trackTabOpen(tabId, url) {
   try {
     const domain = extractDomain(url);
     if (!domain) return;
 
     const now = Date.now();
-    
+
     // If tab was already tracked, close the previous entry first
-    if (openTabs.has(tabId)) {
-      trackTabClose(tabId);
+    const existing = await getTabStartTime(tabId);
+    if (existing) {
+      await trackTabClose(tabId);
     }
 
-    // Record new tab
-    openTabs.set(tabId, {
+    // Record new tab in session storage
+    await setTabStartTime(tabId, {
       domain: domain,
       openedAt: now
     });
 
     // Check if in Focus Mode and domain is in blocklist
-    if (currentFocusSession && currentFocusSession.status === 'active') {
-      checkDistraction(domain);
+    const session = await getStoredFocusSession();
+    if (session && session.status === 'active') {
+      await checkDistraction(domain, tabId);
     }
   } catch (error) {
     console.error('Error tracking tab open:', error);
@@ -116,15 +149,15 @@ function trackTabOpen(tabId, url) {
 // Track tab close: calculate time spent and save to IndexedDB
 async function trackTabClose(tabId) {
   try {
-    const tabData = openTabs.get(tabId);
+    const tabData = await getTabStartTime(tabId);
     if (!tabData) return;
 
     const now = Date.now();
     const timeSpent = now - tabData.openedAt;
     const domain = tabData.domain;
 
-    // Remove from memory
-    openTabs.delete(tabId);
+    // Remove from storage
+    await removeTabStartTime(tabId);
 
     // Save to IndexedDB
     await saveDomainStat(domain, timeSpent);
@@ -144,18 +177,17 @@ function extractDomain(url) {
   }
 }
 
-// Save domain statistics to IndexedDB
-// Uses the helper function from db.js (imported via importScripts)
+// --- FOCUS MODE LOGIC ---
 
 // Check if domain is distracting during Focus Mode
-async function checkDistraction(domain) {
+async function checkDistraction(domain, tabId) {
   try {
     const settings = await getSettings();
     const blocklist = settings.blocklist || [];
-    
+
     if (blocklist.includes(domain)) {
       // Show notification
-      showDistractionNotification(domain);
+      showDistractionNotification(domain, tabId);
     }
   } catch (error) {
     console.error('Error checking distraction:', error);
@@ -163,35 +195,47 @@ async function checkDistraction(domain) {
 }
 
 // Show distraction notification
-function showDistractionNotification(domain) {
+function showDistractionNotification(domain, tabId) {
   chrome.notifications.create({
     type: 'basic',
     iconUrl: 'icons/icon48.png',
     title: 'Focus Mode Active',
-    message: `You're in Focus Mode and opened ${domain}. Stay focused or continue?`,
+    message: `You're in Focus Mode and opened ${domain}. Stay focused!`,
     buttons: [
-      { title: 'Stay Focused' },
+      { title: 'Stay Focused (Close Tab)' },
       { title: 'Continue' }
     ],
     requireInteraction: true
   }, (notificationId) => {
-    // Store notification ID with domain for button click handling
-    chrome.storage.local.set({ [`notification_${notificationId}`]: domain });
+    // Store notification ID with domain AND tabId for button click handling
+    // Using local storage to persist this mapping if needed
+    chrome.storage.local.set({
+      [`notification_${notificationId}`]: { domain, tabId }
+    });
   });
 }
 
 // Handle notification button clicks
 chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
   chrome.notifications.clear(notificationId);
-  
-  const result = await chrome.storage.local.get([`notification_${notificationId}`]);
-  const domain = result[`notification_${notificationId}`];
-  chrome.storage.local.remove([`notification_${notificationId}`]);
 
-  if (buttonIndex === 1) {
+  const key = `notification_${notificationId}`;
+  const result = await chrome.storage.local.get([key]);
+  const data = result[key];
+  if (!data) return; // Notification data lost or expired
+
+  const { domain, tabId } = data;
+  await chrome.storage.local.remove([key]);
+
+  if (buttonIndex === 0) {
+    // User clicked "Stay Focused" - CLOSE THE TAB
+    if (tabId) {
+      chrome.tabs.remove(tabId).catch(err => console.log("Tab already closed or invalid", err));
+    }
+  } else if (buttonIndex === 1) {
     // User clicked "Continue" - log as distraction
     await logDistraction(domain);
-    
+
     chrome.notifications.create({
       type: 'basic',
       iconUrl: 'icons/icon48.png',
@@ -199,18 +243,18 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
       message: `Okay, continuing. This will be logged as a distraction.`
     });
   }
-  // If buttonIndex === 0 (Stay Focused), do nothing
 });
 
 // Log distraction to current focus session
 async function logDistraction(domain) {
   try {
+    const currentFocusSession = await getStoredFocusSession();
     if (!currentFocusSession) return;
 
     const db = await openDB();
     const transaction = db.transaction(['focusSessions'], 'readwrite');
     const store = transaction.objectStore('focusSessions');
-    
+
     const request = store.get(currentFocusSession.id);
     request.onsuccess = () => {
       const session = request.result;
@@ -224,7 +268,8 @@ async function logDistraction(domain) {
           timestamp: Date.now()
         });
         store.put(session);
-        currentFocusSession = session;
+        // Update stored session as well to keep counts in sync (optional but good)
+        setStoredFocusSession(session);
       }
     };
   } catch (error) {
@@ -236,12 +281,31 @@ async function logDistraction(domain) {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'startFocusMode') {
     startFocusMode(request.duration).then(sendResponse);
-    return true; // Keep channel open for async response
+    return true;
   } else if (request.action === 'stopFocusMode') {
     stopFocusMode().then(sendResponse);
     return true;
   } else if (request.action === 'getFocusStatus') {
     getFocusStatus().then(sendResponse);
+    return true;
+  } else if (request.action === 'pauseFocusMode') {
+    // We can implement pause logic if needed, 
+    // for now we might rely on client side or implement basic pause state in session
+    // This refactor focuses on stability first. 
+    // If original code supported pause, we should likely support it.
+    pauseFocusMode().then(sendResponse);
+    return true;
+  } else if (request.action === 'resumeFocusMode') {
+    resumeFocusMode().then(sendResponse);
+    return true;
+  } else if (request.action === 'startStopwatch') {
+    startStopwatch().then(sendResponse);
+    return true;
+  } else if (request.action === 'stopStopwatch') {
+    stopStopwatch().then(sendResponse);
+    return true;
+  } else if (request.action === 'getStopwatchStatus') {
+    getStopwatchStatus().then(sendResponse);
     return true;
   }
 });
@@ -249,13 +313,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Start Focus Mode
 async function startFocusMode(durationMinutes) {
   try {
-    // Stop any existing session first
-    if (currentFocusSession) {
+    // Stop any existing session
+    const existing = await getStoredFocusSession();
+    if (existing) {
       await stopFocusMode();
     }
 
+    // Also stop stopwatch if running
+    await stopStopwatch();
+
+    const id = Date.now().toString();
     const session = {
-      id: Date.now().toString(),
+      id: id,
       startTime: Date.now(),
       plannedDuration: durationMinutes,
       status: 'active',
@@ -263,10 +332,11 @@ async function startFocusMode(durationMinutes) {
       distractions: []
     };
 
-    // Save to IndexedDB using helper function
+    // Save to IndexedDB
     await createFocusSession(session);
 
-    currentFocusSession = session;
+    // Save to Local Storage (Persistence)
+    await setStoredFocusSession(session);
 
     // Set alarm for session end
     const endTime = session.startTime + (durationMinutes * 60 * 1000);
@@ -282,13 +352,46 @@ async function startFocusMode(durationMinutes) {
   }
 }
 
+// Pause Logic
+async function pauseFocusMode() {
+  const session = await getStoredFocusSession();
+  if (session && session.status === 'active') {
+    session.status = 'paused';
+    session.pauseStartTime = Date.now();
+    chrome.alarms.clear('focusSessionEnd'); // Clear alarm while paused
+    await setStoredFocusSession(session);
+    return { success: true };
+  }
+  return { success: false };
+}
+
+async function resumeFocusMode() {
+  const session = await getStoredFocusSession();
+  if (session && session.status === 'paused') {
+    const now = Date.now();
+    const pausedDuration = now - (session.pauseStartTime || now);
+
+    // Adjust start time to account for pause so duration remains correct relative to now
+    session.startTime += pausedDuration;
+    delete session.pauseStartTime;
+    session.status = 'active';
+
+    const endTime = session.startTime + (session.plannedDuration * 60 * 1000);
+    chrome.alarms.create('focusSessionEnd', { when: endTime });
+
+    await setStoredFocusSession(session);
+    return { success: true };
+  }
+  return { success: false };
+}
+
 // Stop Focus Mode
 async function stopFocusMode() {
   try {
+    const currentFocusSession = await getStoredFocusSession();
     if (!currentFocusSession) {
       return { success: false, error: 'No active session' };
     }
-
     await completeFocusSession(currentFocusSession.id);
     return { success: true };
   } catch (error) {
@@ -300,37 +403,39 @@ async function stopFocusMode() {
 // Complete a focus session
 async function completeFocusSession(sessionId) {
   try {
-    // Get session from IndexedDB
     const db = await openDB();
     const transaction = db.transaction(['focusSessions'], 'readwrite');
     const store = transaction.objectStore('focusSessions');
-    
+
     const request = store.get(sessionId);
-    
-    await new Promise((resolve, reject) => {
+
+    return new Promise((resolve, reject) => {
       request.onsuccess = async () => {
         const session = request.result;
         if (session) {
+          // Calculate actual focus time (accounting for pauses if we implemented complex pause logic in IDB, 
+          // but for now simple duration)
+          // If we adjusted startTime during resume, this simple diff works for NET time.
           const actualDuration = Math.floor((Date.now() - session.startTime) / (60 * 1000));
+
           session.status = 'completed';
           session.endTime = Date.now();
-          session.totalFocusMinutes = actualDuration;
-          
+          // limit stored minute count to reasonable bounds (e.g. not negative)
+          session.totalFocusMinutes = Math.max(0, actualDuration);
+
           const putRequest = store.put(session);
           putRequest.onsuccess = async () => {
-            // Clear alarm
+            // Clear alarm & Storage
             chrome.alarms.clear('focusSessionEnd');
-            
-            // Clear current session
-            currentFocusSession = null;
+            await setStoredFocusSession(null);
 
-        // Show completion notification
-        chrome.notifications.create({
-          type: 'basic',
-          iconUrl: 'icons/icon48.png',
-          title: '🎉 Focus Session Complete!',
-          message: `Great job! You focused for ${actualDuration} minutes.`
-        });
+            // Show completion notification
+            chrome.notifications.create({
+              type: 'basic',
+              iconUrl: 'icons/icon48.png',
+              title: '🎉 Focus Session Complete!',
+              message: `Great job! You focused for ${session.totalFocusMinutes} minutes.`
+            });
 
             // Check achievements
             await checkAchievements();
@@ -338,6 +443,8 @@ async function completeFocusSession(sessionId) {
           };
           putRequest.onerror = () => reject(putRequest.error);
         } else {
+          // Session not in DB but was in storage? Clean up storage.
+          await setStoredFocusSession(null);
           resolve();
         }
       };
@@ -351,8 +458,28 @@ async function completeFocusSession(sessionId) {
 // Get current Focus Mode status
 async function getFocusStatus() {
   try {
-    if (!currentFocusSession || currentFocusSession.status !== 'active') {
+    const currentFocusSession = await getStoredFocusSession();
+    if (!currentFocusSession) {
       return { active: false };
+    }
+
+    if (currentFocusSession.status === 'paused') {
+      // Paused state
+      const now = Date.now();
+      // Effectively "frozen" time remaining
+      // We need to calculate what WAS remaining when we paused
+      // But simpler: we know planned duration. 
+      // Logic: EndTime would be startTime + duration.
+      // Since we shift startTime on resume, we can calculate "theoretical" end time now.
+      const effectiveEndTime = currentFocusSession.startTime + (currentFocusSession.plannedDuration * 60 * 1000);
+      // Pause logic is tricky. Let's just return what we have.
+      // The popup handles "Paused" display mostly.
+      return {
+        active: true,
+        status: 'paused',
+        sessionId: currentFocusSession.id,
+        distractionCount: currentFocusSession.distractionCount || 0
+      };
     }
 
     const now = Date.now();
@@ -363,6 +490,7 @@ async function getFocusStatus() {
 
     return {
       active: true,
+      status: 'active',
       sessionId: currentFocusSession.id,
       remainingMs: remainingMs,
       remainingMinutes: remainingMinutes,
@@ -375,11 +503,50 @@ async function getFocusStatus() {
   }
 }
 
+// --- STOPWATCH LOGIC ---
+
+async function startStopwatch() {
+  // Clear focus session if any
+  const existing = await getStoredFocusSession();
+  if (existing) {
+    await stopFocusMode();
+  }
+
+  const state = {
+    isRunning: true,
+    startTime: Date.now(),
+    accumulatedMs: 0
+  };
+  await chrome.storage.local.set({ [KEY_STOPWATCH]: state });
+  return { success: true };
+}
+
+async function stopStopwatch() {
+  await chrome.storage.local.remove([KEY_STOPWATCH]);
+  return { success: true };
+}
+
+async function getStopwatchStatus() {
+  const result = await chrome.storage.local.get([KEY_STOPWATCH]);
+  const state = result[KEY_STOPWATCH];
+  if (state && state.isRunning) {
+    const now = Date.now();
+    const totalMs = (now - state.startTime) + (state.accumulatedMs || 0);
+    const totalSeconds = Math.floor(totalMs / 1000);
+    return {
+      active: true,
+      totalSeconds: totalSeconds
+    };
+  }
+  return { active: false };
+}
+
 // Handle alarm for session end
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === 'focusSessionEnd') {
+    const currentFocusSession = await getStoredFocusSession();
     if (currentFocusSession) {
-      completeFocusSession(currentFocusSession.id);
+      await completeFocusSession(currentFocusSession.id);
     }
   }
 });
@@ -387,10 +554,9 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 // Check and unlock achievements
 async function checkAchievements() {
   try {
-    // Get all completed sessions using helper function
     const allSessions = await getAllFocusSessions();
     const sessions = allSessions.filter(s => s.status === 'completed');
-    
+
     // Check FIRST_SESSION
     if (sessions.length >= 1) {
       await unlockAchievement('FIRST_SESSION');
@@ -438,7 +604,7 @@ async function calculateStreak(sessions) {
   });
 
   const sortedDays = Array.from(daysWithSessions).sort((a, b) => b - a);
-  
+
   let streak = 0;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -455,8 +621,3 @@ async function calculateStreak(sessions) {
 
   return streak;
 }
-
-// Unlock an achievement
-// Uses the helper function from db.js (imported via importScripts)
-// The unlockAchievement function is defined in db.js
-
