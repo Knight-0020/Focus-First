@@ -3,12 +3,36 @@
 
 let focusTimeChart = null;
 
+// Animated Number Counter
+function animateNumber(element, start, end, duration = 1000, suffix = '') {
+  if (!element) return;
+
+  const range = end - start;
+  const increment = range / (duration / 16); // 60fps
+  let current = start;
+
+  const timer = setInterval(() => {
+    current += increment;
+    if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+      current = end;
+      clearInterval(timer);
+    }
+    element.textContent = Math.round(current) + suffix;
+  }, 16);
+}
+
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
   await loadTheme();
   setupEventListeners();
   setupWhiteNoisePlayer();
   await loadDashboardData();
+
+  // Add staggered entrance animation to stat cards
+  document.querySelectorAll('.stat-card').forEach((card, index) => {
+    card.style.animationDelay = `${index * 0.1}s`;
+    card.classList.add('expanded');
+  });
 });
 
 // Load theme preference
@@ -81,7 +105,7 @@ function setupEventListeners() {
 
   const pdfBtn = document.getElementById('pdfBtn');
   if (pdfBtn) {
-    pdfBtn.addEventListener('click', downloadDashboardAsPDF);
+    pdfBtn.addEventListener('click', downloadDashboardAsPDF_Safe);
   }
 
   const emailBtn = document.getElementById('emailBtn');
@@ -134,11 +158,24 @@ function setupEventListeners() {
 
 // Download dashboard as PDF
 // Download dashboard as PDF
+// Download dashboard as PDF
 async function downloadDashboardAsPDF() {
+  const pdfBtn = document.getElementById('pdfBtn');
+  const originalLabel = pdfBtn.innerHTML;
+  const originalTheme = document.body.getAttribute('data-theme');
+
   try {
-    const pdfBtn = document.getElementById('pdfBtn');
     pdfBtn.disabled = true;
-    pdfBtn.textContent = '⏳ Saving...';
+    pdfBtn.textContent = '⏳ Generating High-Contrast PDF...';
+
+    // 1. Force Print Mode (Guarantees White BG + Black Text)
+    document.body.classList.add('print-mode');
+    document.body.setAttribute('data-theme', 'light');
+    updateThemeIcon(false);
+    updateChartTheme(false);
+
+    // Wait for animations/transitions to settle
+    await new Promise(resolve => setTimeout(resolve, 800));
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF('p', 'mm', 'a4');
@@ -153,7 +190,7 @@ async function downloadDashboardAsPDF() {
     // --- PAGE 1: Main Dashboard (excluding Insights) ---
     // Capture dashboard but ignore the insights section
     const canvasMain = await html2canvas(dashboardElement, {
-      backgroundColor: document.body.getAttribute('data-theme') === 'dark' ? '#1a1a2e' : '#f5f7fa',
+      backgroundColor: '#ffffff', // Force white background
       scale: 2,
       logging: false,
       useCORS: true,
@@ -169,7 +206,7 @@ async function downloadDashboardAsPDF() {
     if (insightsElement) {
       // Ensure it's visible for capture
       const canvasInsights = await html2canvas(insightsElement, {
-        backgroundColor: document.body.getAttribute('data-theme') === 'dark' ? '#1a1a2e' : '#f5f7fa',
+        backgroundColor: '#ffffff', // Force white background
         scale: 2,
         logging: false,
         useCORS: true
@@ -187,16 +224,19 @@ async function downloadDashboardAsPDF() {
 
     doc.save(`focus-first-report-${new Date().toISOString().split('T')[0]}.pdf`);
 
-    pdfBtn.disabled = false;
-    pdfBtn.innerHTML = '<span class="btn-icon">📄</span> Save PDF';
   } catch (error) {
     console.error('Error saving PDF:', error);
-    alert('Failed to save PDF.');
-    const pdfBtn = document.getElementById('pdfBtn');
-    if (pdfBtn) {
-      pdfBtn.disabled = false;
-      pdfBtn.innerHTML = '<span class="btn-icon">📄</span> Save PDF';
-    }
+    alert('Failed to save PDF. Please try again.');
+  } finally {
+    // Restore Theme & Remove Print Mode
+    document.body.classList.remove('print-mode');
+    document.body.setAttribute('data-theme', originalTheme);
+    const isDark = originalTheme === 'dark';
+    updateThemeIcon(isDark);
+    updateChartTheme(isDark);
+
+    pdfBtn.disabled = false;
+    pdfBtn.innerHTML = originalLabel;
   }
 }
 
@@ -204,6 +244,11 @@ async function downloadDashboardAsPDF() {
 async function sendEmailReport() {
   const emailInput = document.getElementById('emailInput');
   const email = emailInput.value.trim();
+
+  // 1. Trigger PDF Download
+  if (confirm('Generating PDF report to attach. Please attach the downloaded PDF to the email manually.\n\nContinue?')) {
+    await downloadDashboardAsPDF_Safe();
+  }
 
   // Gather stats
   const totalFocus = document.getElementById('todayFocusTime').textContent || '0 min';
@@ -221,14 +266,18 @@ async function sendEmailReport() {
 🔥 Current Streak: ${streak}
 ⚠️ Top Distraction: ${topDistraction}
 
+📎 PLEASE ATTACH THE DOWNLOADED PDF REPORT TO THIS EMAIL
+
 Keep up the great work!
 - Focus First Extension`);
 
   // Gmail Compose URL
   const gmailLink = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
 
-  // Open in new tab
-  window.open(gmailLink, '_blank');
+  // Open in new tab after a brief delay to allow PDF to start
+  setTimeout(() => {
+    window.open(gmailLink, '_blank');
+  }, 1500);
 }
 
 // Load all dashboard data
@@ -647,7 +696,7 @@ async function loadFocusTimeChart() {
     const isDark = document.body.getAttribute('data-theme') === 'dark';
     const textColor = isDark ? '#eaeaea' : '#333';
     const gridColor = isDark ? '#3a3a5c' : '#e0e0e0';
-    const primaryColor = isDark ? '#7c8dff' : '#667eea';
+    const primaryColor = isDark ? '#00f2fe' : '#4facfe';
 
     if (focusTimeChart) {
       focusTimeChart.destroy();
@@ -663,7 +712,7 @@ async function loadFocusTimeChart() {
         datasets: [{
           label: 'Focus Time (minutes)',
           data: focusMinutes,
-          backgroundColor: isDark ? 'rgba(124, 141, 255, 0.6)' : 'rgba(102, 126, 234, 0.6)',
+          backgroundColor: isDark ? 'rgba(0, 242, 254, 0.6)' : 'rgba(79, 172, 254, 0.6)',
           borderColor: primaryColor,
           borderWidth: 2,
           borderRadius: 8,
@@ -810,3 +859,123 @@ window.addEventListener('beforeunload', () => {
     whiteNoiseAudio = null;
   }
 });
+
+// --- ROBUST PDF GENERATION (v2) ---
+async function downloadDashboardAsPDF_Safe() {
+  const pdfBtn = document.getElementById('pdfBtn');
+  const originalLabel = pdfBtn.textContent;
+
+  try {
+    pdfBtn.disabled = true;
+    pdfBtn.textContent = '? Preparing PDF...';
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 10;
+    const contentWidth = pageWidth - (margin * 2);
+
+    const dashboardElement = document.getElementById('dashboardContent');
+    const insightsElement = document.getElementById('insightsSection');
+
+    // Helper to sanitize cloned document for print
+    const sanitizeForPrint = (clonedDoc) => {
+      const body = clonedDoc.body;
+
+      // Force global styles
+      body.style.setProperty('backgroundColor', '#ffffff', 'important');
+      body.style.setProperty('color', '#000000', 'important');
+      body.style.setProperty('background', '#ffffff', 'important');
+
+      // Force ALL elements to have black text - be extremely aggressive
+      const allElements = clonedDoc.querySelectorAll('*');
+      allElements.forEach(el => {
+        // Force black text on EVERYTHING
+        el.style.setProperty('color', '#000000', 'important');
+        el.style.setProperty('-webkit-text-fill-color', '#000000', 'important');
+        el.style.setProperty('text-shadow', 'none', 'important');
+        el.style.setProperty('opacity', '1', 'important');
+        el.style.setProperty('visibility', 'visible', 'important');
+
+        // Remove ALL backgrounds that might interfere
+        const tagName = el.tagName.toLowerCase();
+        if (tagName !== 'header' && tagName !== 'body') {
+          el.style.setProperty('background', 'none', 'important');
+          el.style.setProperty('background-image', 'none', 'important');
+          el.style.setProperty('background-clip', 'border-box', 'important');
+        }
+
+        // Specific fixes for stat values
+        if (el.classList.contains('stat-value')) {
+          el.style.color = '#003d82';
+          el.style.setProperty('color', '#0066cc', 'important');
+          el.style.setProperty('-webkit-text-fill-color', '#0066cc', 'important');
+        }
+
+        // Fix headers to have white text on blue background
+        if (tagName === 'header') {
+          el.style.setProperty('background', '#0ea5e9', 'important');
+          el.style.setProperty('color', '#000000', 'important');
+        }
+
+        // Force white text for header children
+        if (el.closest('header')) {
+          el.style.color = '#ffffff';
+          el.style.setProperty('color', '#ffffff', 'important');
+          el.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
+        }
+
+        // Ensure card backgrounds are white
+        if (el.classList.contains('stat-card') || el.classList.contains('section')) {
+          el.style.setProperty('backgroundColor', '#ffffff', 'important');
+          el.style.setProperty('border', '1px solid #ddd', 'important');
+          el.style.setProperty('box-shadow', 'none', 'important');
+        }
+      });
+    };
+
+    // --- PAGE 1: Main Dashboard (excluding Insights) ---
+    const canvasMain = await html2canvas(dashboardElement, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      logging: false,
+      useCORS: true,
+      ignoreElements: (element) => element.id === 'insightsSection' || element.classList.contains('white-noise-section'),
+      onclone: sanitizeForPrint
+    });
+
+    const imgDataMain = canvasMain.toDataURL('image/jpeg', 0.95);
+    const imgHeightMain = (canvasMain.height * contentWidth) / canvasMain.width;
+    doc.addImage(imgDataMain, 'JPEG', margin, margin, contentWidth, imgHeightMain);
+
+    // --- PAGE 2: Productivity Insights ---
+    if (insightsElement) {
+      const canvasInsights = await html2canvas(insightsElement, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true,
+        onclone: sanitizeForPrint
+      });
+
+      const imgDataInsights = canvasInsights.toDataURL('image/jpeg', 0.95);
+      const imgHeightInsights = (canvasInsights.height * contentWidth) / canvasInsights.width;
+
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.setTextColor(0, 0, 0);
+      doc.text('Productivity Insights', margin, margin + 10);
+      doc.addImage(imgDataInsights, 'JPEG', margin, margin + 20, contentWidth, imgHeightInsights);
+    }
+
+    doc.save('focus-first-report.pdf');
+
+  } catch (error) {
+    console.error('Error saving PDF:', error);
+    alert('Failed to save PDF.');
+  } finally {
+    pdfBtn.disabled = false;
+    pdfBtn.textContent = originalLabel;
+  }
+}
+

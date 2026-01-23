@@ -1,6 +1,27 @@
 // Focus First Popup Script
 // Enhanced Pomodoro Timer with Dark Mode Support
 
+// Motivational Quotes
+const motivationalQuotes = [
+  "Stay focused and keep going! 🚀",
+  "Small progress is still progress. 💪",
+  "Your future self will thank you. ⭐",
+  "Focus is the gateway to success. 🎯",
+  "One task at a time, one step at a time. 👣",
+  "Discipline is choosing what you want most over what you want now. 🔥",
+  "The secret of getting ahead is getting started. ✨",
+  "Don't watch the clock; do what it does. Keep going. ⏰",
+  "Success is the sum of small efforts repeated daily. 📈",
+  "You're doing great! Keep it up! 🌟",
+  "Deep work leads to deep results. 🧠",
+  "Eliminate distractions, amplify focus. 🎵",
+  "Every expert was once a beginner. 🌱",
+  "Progress over perfection. 💎",
+  "Your only limit is you. 🦅"
+];
+
+let currentQuoteIndex = 0;
+
 let focusStatusInterval = null;
 let pomodoroState = {
   isRunning: false,
@@ -28,7 +49,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupEventListeners();
   startStatusPolling();
   updateProgressRing();
+
+  // Start quote rotation
+  rotateQuote();
+  setInterval(rotateQuote, 8000); // Change quote every 8 seconds
 });
+
 
 // Load theme preference
 async function loadTheme() {
@@ -531,9 +557,9 @@ function updateProgressRing() {
   // Update gradient color based on session type
   const isDark = document.body.getAttribute('data-theme') === 'dark';
   if (pomodoroState.sessionType === 'focus') {
-    circle.style.stroke = isDark ? 'url(#progressGradient)' : '#667eea';
+    circle.style.stroke = isDark ? 'url(#progressGradient)' : '#4facfe';
   } else {
-    circle.style.stroke = isDark ? 'url(#breakGradient)' : '#28a745';
+    circle.style.stroke = isDark ? 'url(#breakGradient)' : '#43e97b';
   }
 }
 
@@ -621,6 +647,26 @@ function resetTimerState(stopStopwatch = false) {
   pomodoroState.remainingSeconds = 0; // or reset to duration
   updateTimerFromSelection();
   updateProgressRing();
+}
+
+// Rotate motivational quote with fade animation
+function rotateQuote() {
+  const quoteElement = document.getElementById('quoteText');
+  if (!quoteElement) return;
+
+  // Fade out
+  quoteElement.style.opacity = '0';
+  quoteElement.style.transform = 'translateY(10px)';
+
+  setTimeout(() => {
+    // Change quote
+    currentQuoteIndex = (currentQuoteIndex + 1) % motivationalQuotes.length;
+    quoteElement.textContent = motivationalQuotes[currentQuoteIndex];
+
+    // Fade in
+    quoteElement.style.opacity = '1';
+    quoteElement.style.transform = 'translateY(0)';
+  }, 300);
 }
 
 // Cleanup on popup close

@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Focus First</title>
   <link rel="stylesheet" href="css/popup.css">
 </head>
+
 <body>
   <div class="container">
     <header>
@@ -14,19 +16,19 @@
         <span class="theme-icon">🌙</span>
       </button>
     </header>
-    
+
     <!-- Pomodoro Timer Section -->
     <div id="pomodoroSection" class="pomodoro-section">
       <div class="pomodoro-ring">
         <svg class="progress-ring" width="200" height="200">
           <defs>
             <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
-              <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+              <stop offset="0%" style="stop-color:#4facfe;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#00f2fe;stop-opacity:1" />
             </linearGradient>
             <linearGradient id="breakGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#28a745;stop-opacity:1" />
-              <stop offset="100%" style="stop-color:#20c997;stop-opacity:1" />
+              <stop offset="0%" style="stop-color:#43e97b;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#38f9d7;stop-opacity:1" />
             </linearGradient>
           </defs>
           <circle class="progress-ring-bg" cx="100" cy="100" r="90" />
@@ -39,7 +41,7 @@
           <div class="progress-percentage" id="progressPercentage">100%</div>
         </div>
       </div>
-      
+
       <div class="pomodoro-controls">
         <button id="startFocusBtn" class="btn btn-primary btn-circle" title="Start">
           <span class="btn-icon">▶</span>
@@ -54,7 +56,7 @@
           <span class="btn-icon">⏭</span>
         </button>
       </div>
-      
+
       <div class="session-indicators">
         <span id="sessionDots" class="session-dots">
           <span class="dot"></span>
@@ -84,12 +86,12 @@
           <option value="custom">Custom</option>
         </select>
       </div>
-      
+
       <div id="customDurationInput" class="custom-duration hidden">
         <label for="customMinutes">Custom (minutes):</label>
         <input type="number" id="customMinutes" min="1" max="120" value="30">
       </div>
-      
+
       <div class="break-settings">
         <div class="break-option">
           <label for="shortBreak">Short Break:</label>
@@ -127,8 +129,14 @@
       <button id="openDashboard" class="btn btn-link">📊 Dashboard</button>
       <button id="openOptions" class="btn btn-link">⚙️ Settings</button>
     </div>
+
+    <!-- Motivational Quotes -->
+    <div class="quotes-section" id="quotesSection">
+      <p class="quote-text" id="quoteText">Stay focused and keep going! 🚀</p>
+    </div>
   </div>
   <script src="db.js"></script>
   <script src="popup.js"></script>
 </body>
+
 </html>

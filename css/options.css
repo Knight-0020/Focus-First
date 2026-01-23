@@ -227,15 +227,41 @@ header h1 {
   animation: equalizer 0.8s ease-in-out infinite;
 }
 
-.visualizer-bars .bar:nth-child(1) { height: 20px; animation-delay: 0s; }
-.visualizer-bars .bar:nth-child(2) { height: 30px; animation-delay: 0.1s; }
-.visualizer-bars .bar:nth-child(3) { height: 25px; animation-delay: 0.2s; }
-.visualizer-bars .bar:nth-child(4) { height: 35px; animation-delay: 0.3s; }
-.visualizer-bars .bar:nth-child(5) { height: 22px; animation-delay: 0.4s; }
+.visualizer-bars .bar:nth-child(1) {
+  height: 20px;
+  animation-delay: 0s;
+}
+
+.visualizer-bars .bar:nth-child(2) {
+  height: 30px;
+  animation-delay: 0.1s;
+}
+
+.visualizer-bars .bar:nth-child(3) {
+  height: 25px;
+  animation-delay: 0.2s;
+}
+
+.visualizer-bars .bar:nth-child(4) {
+  height: 35px;
+  animation-delay: 0.3s;
+}
+
+.visualizer-bars .bar:nth-child(5) {
+  height: 22px;
+  animation-delay: 0.4s;
+}
 
 @keyframes equalizer {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(0.5); }
+
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+
+  50% {
+    transform: scaleY(0.5);
+  }
 }
 
 .now-playing {
@@ -586,6 +612,16 @@ header h1 {
   background: #2a2a4a;
 }
 
+/* Fix visibility in Dark Mode */
+[data-theme="dark"] .checkbox-label {
+  color: #eaeaea;
+}
+
+[data-theme="dark"] .btn-primary {
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: #0f172a;
+}
+
 /* Setting Row Styles */
 .setting-row {
   display: flex;
@@ -667,11 +703,11 @@ header h1 {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-.toggle-switch input:checked + .toggle-slider {
+.toggle-switch input:checked+.toggle-slider {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.toggle-switch input:checked + .toggle-slider:before {
+.toggle-switch input:checked+.toggle-slider:before {
   transform: translateX(24px);
 }
 
@@ -759,4 +795,3 @@ header h1 {
 [data-theme="dark"] .header-subtitle {
   color: #888;
 }
-
